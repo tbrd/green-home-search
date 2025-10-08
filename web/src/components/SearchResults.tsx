@@ -3,10 +3,10 @@ import { useQuery } from '@tanstack/react-query'
 import DebugPanel from './DebugPanel'
 import { type Result, fetchSearch, API_BASE } from '../queries/searchQuery'
 
-const SearchResults: React.FC<{ query: string | null; radius?: number }> = ({ query, radius = 1000 }) => {
+const SearchResults: React.FC<{ query: string | null; }> = ({ query }) => {
 	const queryResult = useQuery<Result[], Error>({
-		queryKey: ['search', query, radius],
-		queryFn: () => fetchSearch(query, radius),
+		queryKey: ['search', query],
+		queryFn: () => fetchSearch(query),
 		enabled: !!query,
 	})
 
@@ -26,7 +26,7 @@ const SearchResults: React.FC<{ query: string | null; radius?: number }> = ({ qu
 		// try to store raw response when available
 		if (data) setLastRawResponse(JSON.stringify(data, null, 2))
 		if (error) setLastRawResponse((error as Error).message)
-	}, [query, data, error, radius])
+	}, [query, data, error])
 
 	if (!query) return <div>Enter a location to search.</div>
 	if (isLoading) return <div>Searching...</div>
