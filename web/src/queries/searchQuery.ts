@@ -7,7 +7,7 @@ export interface Result {
 
 	// Address/display
 	name?: string;
-	address?: string;
+	address: string;
 	address_line?: string;
 	postcode?: string;
 
@@ -28,10 +28,15 @@ export interface Result {
 
 export const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api';
 
-export async function fetchSearch(q: string | null, _r = 1000) {
-	if (!q) return [] as Result[];
+export async function fetchSearch(q: string | null, searchAfter?: string) {
+	if (!q) return { data: [] as Result[] };
 
-	const url = `${API_BASE}/search?address=${encodeURIComponent(q)}`;
+	const searchParams = new URLSearchParams();
+	
+	searchParams.set('address', q);
+	if (searchAfter) searchParams.set('searchAfter', searchAfter);
+
+	const url = `${API_BASE}/search?${searchParams.toString()}`;
 	const res = await fetch(url);
 
 	// Treat 404 as an error so the UI surfaces it explicitly
@@ -54,7 +59,15 @@ export async function fetchSearch(q: string | null, _r = 1000) {
 		throw new Error(`Invalid JSON response`);
 	}
 
-	console.log(payload);
+	const dedupedPayload: Result[] = payload.reduce((acc: Result[], item: Result) => {
+		if (!acc.find(i => i.uprn === item.uprn)) {
+			acc.push(item);
+		}
+		return acc;
+	}, [] as Result[]);
 
-	return payload as Result[];
+	return {
+		data: dedupedPayload,
+		nextSearchAfter: res.headers.get('X-Next-Search-After') ?? undefined
+	}
 }

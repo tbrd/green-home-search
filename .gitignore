@@ -13,3 +13,7 @@ __pycache__/
 */node_modules/
 
 .vscode/
+
+opensearch-epc/domestic-2023/certificates.csv
+opensearch-epc/domestic-2023/columns.csv
+opensearch-epc/domestic-2023/recommendations.csv

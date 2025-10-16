@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, Query, Request, Response
 from fastapi import HTTPException
 from typing import List
 from fastapi.middleware.cors import CORSMiddleware
@@ -53,6 +53,7 @@ async def root():
 @app.get("/search", summary="Search places by address")
 async def search(
     request: Request,
+    response: Response,
     address: str = Query(..., description="Address or place to search for (example: 'High Wycombe')"),
 ):
     """
@@ -98,9 +99,14 @@ async def search(
 
         payload = resp.json()
         results = payload.get("rows")
+        nextSearchAfter = resp.headers.get("x-next-search-after")
 
         count = len(results) if results else 0
         logger.info("/search returning %d results for address=%s", count, address)
+
+        if nextSearchAfter:
+            response.headers["X-Next-Search-After"] = nextSearchAfter
+
         return results or []
     except httpx.HTTPStatusError as e:
         logger.error("EPC API status error: %s", e)
