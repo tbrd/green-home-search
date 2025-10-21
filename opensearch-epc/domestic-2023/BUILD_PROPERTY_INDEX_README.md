@@ -81,9 +81,17 @@ This script builds a comprehensive property index from the EPC certificates inde
 
 Install dependencies inside a virtual environment:
 
+**Bash/Linux/macOS:**
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+source .venv/bin/activate
+pip install opensearch-py
+```
+
+**PowerShell/Windows:**
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install opensearch-py
 ```
 
@@ -91,6 +99,7 @@ pip install opensearch-py
 
 ### Basic Usage
 
+**Bash/Linux/macOS:**
 ```bash
 # Set environment variables
 export OPENSEARCH_URL='http://localhost:9200'
@@ -101,8 +110,20 @@ export OPENSEARCH_PASS='admin'
 python build_property_index.py
 ```
 
+**PowerShell/Windows:**
+```powershell
+# Set environment variables
+$env:OPENSEARCH_URL='http://localhost:9200'
+$env:OPENSEARCH_USER='admin'
+$env:OPENSEARCH_PASS='admin'
+
+# Run the script
+python build_property_index.py
+```
+
 ### With Command Line Arguments
 
+**Bash/Linux/macOS:**
 ```bash
 python build_property_index.py \
   --opensearch-url http://localhost:9200 \
@@ -110,6 +131,17 @@ python build_property_index.py \
   --password admin \
   --cert-index domestic-2023-certificates \
   --prop-index domestic-2023-properties \
+  --batch-size 500
+```
+
+**PowerShell/Windows:**
+```powershell
+python build_property_index.py `
+  --opensearch-url http://localhost:9200 `
+  --user admin `
+  --password admin `
+  --cert-index domestic-2023-certificates `
+  --prop-index domestic-2023-properties `
   --batch-size 500
 ```
 
@@ -170,7 +202,20 @@ The script creates a properties index with the following mapping:
 
 Run the test suite:
 
+**Bash/Linux/macOS:**
 ```bash
+# Run all tests
+python -m pytest test_build_property_index.py -v
+
+# Run specific test class
+python -m pytest test_build_property_index.py::TestPropertyMapping -v
+
+# Run with coverage
+python -m pytest test_build_property_index.py --cov=build_property_index --cov-report=term-missing
+```
+
+**PowerShell/Windows:**
+```powershell
 # Run all tests
 python -m pytest test_build_property_index.py -v
 
@@ -196,21 +241,50 @@ For large datasets (millions of properties), consider:
 ## Workflow
 
 1. First, ingest certificates using `ingest_domestic_2023.py`:
+   
+   **Bash/Linux/macOS:**
    ```bash
+   python ingest_domestic_2023.py --csv certificates.csv --schema schema.json
+   ```
+   
+   **PowerShell/Windows:**
+   ```powershell
    python ingest_domestic_2023.py --csv certificates.csv --schema schema.json
    ```
 
 2. Then, build the properties index:
+   
+   **Bash/Linux/macOS:**
    ```bash
+   python build_property_index.py
+   ```
+   
+   **PowerShell/Windows:**
+   ```powershell
    python build_property_index.py
    ```
 
 3. Query the properties index for specific properties or search by criteria:
+   
+   **Bash/Linux/macOS:**
    ```bash
    # Example: Find properties with high energy ratings
    curl -X POST "localhost:9200/domestic-2023-properties/_search" \
      -H 'Content-Type: application/json' \
      -d '{
+       "query": {
+         "term": {"latest_epc.rating": "A"}
+       }
+     }'
+   ```
+   
+   **PowerShell/Windows:**
+   ```powershell
+   # Example: Find properties with high energy ratings
+   Invoke-RestMethod -Uri "http://localhost:9200/domestic-2023-properties/_search" `
+     -Method Post `
+     -ContentType "application/json" `
+     -Body '{
        "query": {
          "term": {"latest_epc.rating": "A"}
        }
