@@ -107,7 +107,7 @@ def parse_value(val: str, dtype: Any):
     return val
 
 
-def ingest_certificates(client: OpenSearch, csv_path: str, schema: Dict[str, Any], index_name: str, batch_size: int = 5000):
+def ingest_certificates(client: OpenSearch, csv_path: str, schema: Dict[str, Any], index_name: str, batch_size: int = 1000):
     # create index with mapping
     mapping = build_mapping_from_schema(schema)
     if client.indices.exists(index=index_name):
@@ -118,9 +118,12 @@ def ingest_certificates(client: OpenSearch, csv_path: str, schema: Dict[str, Any
 
     actions = []
     total = 0
+    processed = 0
+    
     with open(csv_path, newline='', encoding='utf-8') as fh:
         reader = csv.DictReader(fh)
         for row in reader:
+            processed += 1
             doc: Dict[str, Any] = {}
             for col, dtype in schema['columns'].items():
                 raw = row.get(col)
@@ -133,82 +136,27 @@ def ingest_certificates(client: OpenSearch, csv_path: str, schema: Dict[str, Any
             if doc_id:
                 action['_id'] = doc_id
             actions.append(action)
+            
             if len(actions) >= batch_size:
-                helpers.bulk(client, actions)
-                total += len(actions)
-                print(f'Indexed {total} certificates...')
-                actions = []
+                try:
+                    helpers.bulk(client, actions, chunk_size=batch_size, max_retries=3, request_timeout=60)
+                    total += len(actions)
+                    print(f'Indexed {total} certificates... (processed {processed} rows)')
+                    actions.clear()  # Explicit clear for memory
+                except Exception as e:
+                    print(f'Error indexing batch: {e}')
+                    # Continue with next batch
+                    actions.clear()
+                    
     if actions:
-        helpers.bulk(client, actions)
-        total += len(actions)
-        print(f'Indexed {total} certificates (final)')
-
-
-def build_properties_index_from_certificates(client: OpenSearch, cert_index: str, prop_index: str, batch_size: int = 5000, date_field_candidates=None):
-    # Create properties index with a simple mapping; we'll store latest certificate fields under 'latest'
-    if client.indices.exists(index=prop_index):
-        print(f'Properties index {prop_index} already exists')
-    else:
-        mapping = {
-            'mappings': {
-                'properties': {
-                    'UPRN': {'type': 'keyword'},
-                    'location': {'type': 'geo_point'},
-                    'latest': {'type': 'object', 'dynamic': True}
-                }
-            }
-        }
-        client.indices.create(index=prop_index, body=mapping)
-        print(f'Created properties index {prop_index}')
-
-    # Composite aggregation to page through all UPRNs and fetch top_hit by date
-    if date_field_candidates is None:
-        date_field_candidates = ['LODGEMENT_DATETIME', 'LODGEMENT_DATE', 'INSPECTION_DATE']
-
-    # composite aggregation source
-    comp_source = [{'uprn': {'terms': {'field': 'UPRN.keyword'}}}]
-    after_key = None
-    total_props = 0
-    while True:
-        body = {
-            'size': 0,
-            'aggs': {
-                'by_uprn': {
-                    'composite': {'size': 1000, 'sources': comp_source, **({'after': after_key} if after_key else {})},
-                    'aggs': {
-                        'latest': {
-                            'top_hits': {
-                                'size': 1,
-                                'sort': [{date_field_candidates[0]: {'order': 'desc'}}]
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        res = client.search(index=cert_index, body=body)
-        buckets = res['aggregations']['by_uprn']['buckets']
-        actions = []
-        for b in buckets:
-            uprn = b['key']['uprn']
-            hit = b['latest']['hits']['hits'][0]
-            src = hit['_source']
-            doc = {'UPRN': uprn, 'latest': src}
-            # copy location if present
-            if 'location' in src:
-                doc['location'] = src['location']
-            action = {'_index': prop_index, '_id': str(uprn), '_source': doc}
-            actions.append(action)
-        if actions:
-            helpers.bulk(client, actions)
-            total_props += len(actions)
-            print(f'Indexed {total_props} properties...')
-        # paging
-        after_key = res['aggregations']['by_uprn'].get('after_key')
-        if not after_key:
-            break
-
-    print(f'Properties indexing complete: {total_props} documents')
+        try:
+            helpers.bulk(client, actions, chunk_size=batch_size, max_retries=3, request_timeout=60)
+            total += len(actions)
+            print(f'Indexed {total} certificates (final, processed {processed} rows)')
+        except Exception as e:
+            print(f'Error indexing final batch: {e}')
+        finally:
+            actions.clear()
 
 
 def main(argv=None):
@@ -220,9 +168,8 @@ def main(argv=None):
     p.add_argument('--password', default=os.environ.get('OPENSEARCH_PASS'))
     p.add_argument('--index-certificates', default='domestic-2023-certificates')
     p.add_argument('--index-properties', default='domestic-2023-properties')
-    p.add_argument('--batch-size', type=int, default=5000)
+    p.add_argument('--batch-size', type=int, default=1000)
     p.add_argument('--postcode-lookup', default=None, help='CSV with postcode,lat,lon to enrich location')
-    p.add_argument('--build-properties', action='store_true', help='Build properties index (latest per UPRN) after ingest')
     args = p.parse_args(argv)
 
     schema_path = os.path.join(os.path.dirname(__file__), args.schema) if not os.path.isabs(args.schema) else args.schema
@@ -232,9 +179,6 @@ def main(argv=None):
     client = OpenSearch([args.opensearch_url], http_auth=(args.user, args.password) if args.user else None)
 
     ingest_certificates(client, csv_path, schema, args.index_certificates, batch_size=args.batch_size)
-
-    if args.build_properties:
-        build_properties_index_from_certificates(client, args.index_certificates, args.index_properties, batch_size=args.batch_size)
 
 
 if __name__ == '__main__':
