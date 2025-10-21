@@ -28,13 +28,27 @@ export interface Result {
 
 export const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api';
 
-export async function fetchSearch(q: string | null, searchAfter?: string) {
-	if (!q) return { data: [] as Result[] };
+export type Response = {
+	results: Result[];
+	total?: number;
+	took?: number;
+	offset?: number;
+	limit?: number;
+}
+	
+
+
+export const fetchSearch = async ({query: q, pageIndex = 0, pageSize = 10}: {query: {location: string | null, energyRating?: string}, pageIndex: number, pageSize?: number }): Promise<Response> => {
+	if (!q.location) return { results: [] };
 
 	const searchParams = new URLSearchParams();
 	
-	searchParams.set('address', q);
-	if (searchAfter) searchParams.set('searchAfter', searchAfter);
+	searchParams.set('address', q.location);
+	if (q.energyRating) {
+		searchParams.set('energy_rating', q.energyRating);
+	}
+	searchParams.set('offset', (pageIndex * pageSize).toString());
+	searchParams.set('limit', pageSize.toString());
 
 	const url = `${API_BASE}/search?${searchParams.toString()}`;
 	const res = await fetch(url);
@@ -59,15 +73,9 @@ export async function fetchSearch(q: string | null, searchAfter?: string) {
 		throw new Error(`Invalid JSON response`);
 	}
 
-	const dedupedPayload: Result[] = payload.reduce((acc: Result[], item: Result) => {
-		if (!acc.find(i => i.uprn === item.uprn)) {
-			acc.push(item);
-		}
-		return acc;
-	}, [] as Result[]);
-
 	return {
-		data: dedupedPayload,
-		nextSearchAfter: res.headers.get('X-Next-Search-After') ?? undefined
+		...payload,
+
 	}
 }
+

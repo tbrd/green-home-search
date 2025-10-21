@@ -4,19 +4,22 @@ import LocationSearch from './components/LocationSearch'
 import SearchResults from './components/SearchResults'
 
 function App() {
-  const [query, setQuery] = useState<string | null>(null)
+  const [query, setQuery] = useState<{location: string | null, energyRating?: string}>({location: null});
+  const [searchTrigger, setSearchTrigger] = useState<number>(0)
+
+  const handleSearch = ({location, energyRating}: {location: string | null, energyRating?: string}) => {
+    setQuery({location, energyRating})
+    setSearchTrigger(Date.now()) // Force a new search even if location is the same
+  }
 
   return (
     <div style={{ padding: 20 }}>
       <h1>Green Home Search</h1>
-      <LocationSearch onSearch={(location) => setQuery(location || null)} />
+      <LocationSearch onSearch={handleSearch} />
 
-      <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
-        <label style={{ fontSize: 14 }}>Radius (meters):</label>
-      </div>
 
       <div style={{ marginTop: 20 }}>
-        <SearchResults query={query} />
+        <SearchResults query={query} searchTrigger={searchTrigger} />
       </div>
     </div>
   )
