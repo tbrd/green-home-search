@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Query, Request, Response
 from fastapi import HTTPException
-from typing import List
+from typing import List, Dict, Any
 from fastapi.middleware.cors import CORSMiddleware
 import math
 import os
@@ -8,6 +8,9 @@ import httpx
 # optionally load a local .env file for development; secrets should not be committed
 from dotenv import load_dotenv
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'), override=False)
+
+# Import running cost calculation
+from running_cost import calculate_running_cost
 
 
 # We return upstream EPC data as-is; do not rename or map fields.
@@ -46,6 +49,35 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 @app.get("/", summary="API root")
 async def root():
     return {"status": "ok", "message": "Green Home Search API - see /docs"}
+
+
+@app.post("/running-cost", summary="Calculate running cost from EPC document")
+async def get_running_cost(epc_document: Dict[str, Any]):
+    """
+    Calculate monthly running cost based on EPC rating.
+    
+    Parameters:
+    - epc_document: An EPC document with a 'current-energy-rating' or 'CURRENT_ENERGY_RATING' field
+    
+    Returns:
+    - running_cost: Monthly running cost in GBP, or null if rating is invalid
+    
+    Example request body:
+    ```json
+    {
+        "current-energy-rating": "C"
+    }
+    ```
+    
+    Example response:
+    ```json
+    {
+        "running_cost": 100
+    }
+    ```
+    """
+    cost = calculate_running_cost(epc_document)
+    return {"running_cost": cost}
 
 
 
