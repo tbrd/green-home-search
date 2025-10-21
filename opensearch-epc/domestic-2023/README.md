@@ -5,6 +5,7 @@ This folder contains:
 - `certificates.csv` — the raw EPC certificates CSV (downloaded from the source)
 - `schema.json` — CSVW schema describing the CSV columns
 - `ingest_domestic_2023.py` — a Python script to create mappings and bulk ingest into OpenSearch
+- `build_property_index.py` — a Python script to build a comprehensive property index from certificates (NEW)
 
 Requirements
 - Python 3.9+
@@ -28,11 +29,31 @@ $env:OPENSEARCH_PASS='admin'
 python ingest_domestic_2023.py --csv certificates.csv --schema schema.json --opensearch-url http://localhost:9200 --user admin --password admin --build-properties
 ```
 
+Building the Property Index (Recommended)
+
+For a richer, more comprehensive property index, use the new `build_property_index.py` script:
+
+```bash
+# Step 1: Ingest certificates
+python ingest_domestic_2023.py --csv certificates.csv --schema schema.json
+
+# Step 2: Build property index with full details
+python build_property_index.py
+```
+
+This creates a `domestic-2023-properties` index where each document represents a unique property with:
+- Complete address information
+- Latest EPC certificate with detailed fields
+- Historical EPC certificates array
+- Estimated running costs
+- Solar panel and renewable energy detection
+
+See [BUILD_PROPERTY_INDEX_README.md](BUILD_PROPERTY_INDEX_README.md) for full documentation.
+
 Notes & recommendations
 
-- The script creates two indices by default: `domestic-2023-certificates` (every certificate row) and `domestic-2023-properties` (one document per property containing the latest certificate by UPRN).
+- `ingest_domestic_2023.py` creates a `domestic-2023-certificates` index with every certificate row.
+- `build_property_index.py` (NEW) creates a richer `domestic-2023-properties` index with one document per property containing latest EPC, historical EPCs array, and additional metadata.
 - For faster bulk imports temporarily set `number_of_replicas` to 0 and `refresh_interval` to `-1` on the target index, then restore them after the bulk load.
 - If you have a postcode->lat/lon lookup CSV, pass `--postcode-lookup path/to/postcodes.csv` to populate a `location` geo_point from postcodes.
 - The mapping is inferred from `schema.json` and includes a `location` geo_point. You may want to refine mappings for numeric/date fields after inspecting sample documents.
-
-If you want me to tune mappings for specific queries (geo+filters on energy rating, construction age, wind turbines, fuel type), paste a small sample (5-10) rows and I will provide a recommended mapping optimized for those queries.
