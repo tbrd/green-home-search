@@ -66,16 +66,13 @@ export const fetchSearch = async ({query: q, pageIndex = 0, pageSize = 10}: {que
 
 	const text = await res.text().catch(() => '');
 
-	let payload: Response | null = null;
+	let payload: Response;
 	try {
-		payload = text ? JSON.parse(text) as Response : null;
+		payload = text ? JSON.parse(text) as Response : { results: [] };
 	} catch {
 		throw new Error(`Invalid JSON response`);
 	}
 
-	return {
-		...payload,
-
-	}
+	return payload;
 }
 
