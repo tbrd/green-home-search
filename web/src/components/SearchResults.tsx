@@ -1,82 +1,70 @@
 import React, { useEffect, useState } from 'react'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
-import DebugPanel from './DebugPanel'
-import { type Result, fetchSearch, API_BASE } from '../queries/searchQuery'
+import { fetchSearch, type Response } from '../queries/searchQuery'
 
-const SearchResults: React.FC<{ query: string | null }> = ({ query}) => {
-	const [pages, setPages] = useState<string[]>(["default"]);
-	const [page, setPage] = useState(1);
+const SearchResults: React.FC<{ query: { location: string | null; energyRating?: string }; searchTrigger: number }> = ({ query, searchTrigger }) => {
+	const [pageIndex, setPageIndex] = useState(0);
+	const PAGE_SIZE = 20;
 
-	const queryResult = useQuery<{ data: Result[], nextSearchAfter?: string }, Error>({
-		queryKey: ['search', query, page],
-		queryFn: () => fetchSearch(query, pages[page]),
+	// Reset pagination when searchTrigger changes (new search initiated)
+	useEffect(() => {
+		setPageIndex(0);
+	}, [searchTrigger]);
+
+	const { isLoading, error, data} = useQuery<Response, Error>({
+		queryKey: ['search', query, pageIndex, searchTrigger],
+		queryFn: () => fetchSearch({query, pageIndex, pageSize: PAGE_SIZE}),
 		enabled: !!query,
 		placeholderData: keepPreviousData,
 	});
 
-	const { data: { data, nextSearchAfter } = {}, error, isLoading } = queryResult
-	const [lastRequestUrl, setLastRequestUrl] = useState<string | undefined>(undefined)
-	const [lastRawResponse, setLastRawResponse] = useState<string | undefined>(undefined)
 
-	// if we have a nextSearchAfter and we're on the last page, add it to the pages list
-
-	useEffect(() => {
-		if (nextSearchAfter && page === pages.length) {
-			setPages((p) => [...p, nextSearchAfter]);
-		}
-	}, [nextSearchAfter, pages])
-
-
-	// set debug info when query finishes
-	React.useEffect(() => {
-		if (!query) {
-			setLastRequestUrl(undefined)
-			setLastRawResponse(undefined)
-			return
-		}
-		const url = `${API_BASE}/search?address=${encodeURIComponent(query)}`
-		setLastRequestUrl(url)
-		// try to store raw response when available
-		if (data) setLastRawResponse(JSON.stringify(data, null, 2))
-		if (error) setLastRawResponse((error as Error).message)
-	}, [query, data, error])
-
-	if (!query) return <div>Enter a location to search.</div>
+	if (!query.location) return <div>Enter a postcode to search.</div>
 	if (isLoading) return <div>Searching...</div>
 	if (error) return <div>Error: {error.message}</div>
 
-	const results = data ?? []
+	const { results, total, took, offset, limit } = data ?? {results: []}
+	const nextPageExists = (offset ?? 0) + (limit ?? 0) < (total ?? 0);
 
 	return (
 		<div>
-			<h2>Results for “{query}”</h2>
 			{results.length > 0 ? (
 				<>
-				<ol>
-					{results.map((res) => {
-						
-						return (
-							<li key={res.uprn} style={{ marginBottom: 8 }}>
-								<strong>{res.address}</strong>
-								{/* <div style={{ fontSize: 12 }}>{res["built-form"] ?? "unknown"}</div> */}
-								{/* <div style={{ fontSize: 12 }}>Energy rating: {res["current-energy-rating"] ?? "unknown"}</div> */}
-							</li>
-						)
-					})}
-				</ol>
-
-
+				<table>
+					<thead>
+						<tr>
+							<th>Address</th>
+							<th>EPC Rating</th>					
+						</tr>
+					</thead>
+					<tbody>
+						{results.map((res) => (
+							<tr key={res.uprn}>
+								<td>{res.address}</td>
+								<td>{res["current_energy_rating"] ?? "unknown"}</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
 				
-				Current page: {page}
-				<button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 1}>Previous</button>
-				<button onClick={() => setPage((p) => p + 1)} disabled={!pages[page]}>Next</button>
+
+				<ul style={{ listStyle: 'none', padding: 0, display: 'flex', gap: '16px', marginTop: '16px' }}>
+					<li>Total results: {total}</li>
+					<li>Offset: {offset}</li>
+					<li>Limit: {limit}</li>
+					<li>Search took: {took} ms</li>
+				</ul>
+					
+
+				Current page: {pageIndex + 1} of {Math.ceil((total ?? 0) / (limit ?? 10))}
+				<button onClick={() => setPageIndex((p) => Math.max(0, p - 1))} disabled={pageIndex === 0}>Previous</button>
+				<button onClick={() => setPageIndex((p) => p + 1)} disabled={!nextPageExists}>Next</button>
 
 				</>
 			) : (
 				<div>No results</div>
 			)}
 
-			<DebugPanel requestUrl={lastRequestUrl} rawResponse={lastRawResponse} error={error ? (error as Error).message : undefined} />
 		</div>
 	)
 }
