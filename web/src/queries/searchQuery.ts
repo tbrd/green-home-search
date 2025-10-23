@@ -23,7 +23,7 @@ export interface Result {
 	energy_rating?: string;
 
 	// allow other fields
-	[key: string]: any;
+	[key: string]: unknown;
 }
 
 export const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api';
@@ -66,10 +66,10 @@ export const fetchSearch = async ({query: q, pageIndex = 0, pageSize = 10}: {que
 
 	const text = await res.text().catch(() => '');
 
-	let payload: any = null;
+	let payload: Response | null = null;
 	try {
-		payload = text ? JSON.parse(text) : null;
-	} catch (e) {
+		payload = text ? JSON.parse(text) as Response : null;
+	} catch {
 		throw new Error(`Invalid JSON response`);
 	}
 
