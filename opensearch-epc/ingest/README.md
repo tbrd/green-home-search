@@ -26,7 +26,7 @@ Example usage
 $env:OPENSEARCH_URL='http://localhost:9200'
 $env:OPENSEARCH_USER='admin'
 $env:OPENSEARCH_PASS='admin'
-python ingest_domestic_2023.py --csv certificates.csv --schema schema.json --opensearch-url http://localhost:9200 --user admin --password admin --build-properties
+python ingest.py --csv ./data/domestic/certificates.csv --schema ./data/domestic/schema.json --opensearch-url http://localhost:9200 --user admin --password admin --build-properties
 ```
 
 Building the Property Index (Recommended)

@@ -4,10 +4,7 @@ Ingest domestic-2023 certificates.csv into OpenSearch.
 
 Features:
 - Reads `schema.json` (CSVW) in the same folder to infer types and build a mapping.
-- Bulk indexes `certificates.csv` into an index (default: domestic-2023-certificates).
-- Optionally builds a properties index (default: domestic-2023-properties) containing
-  the latest certificate per `UPRN` using a composite aggregation + top_hits.
-- Optionally enrich with postcode->lat/lon CSV to populate a `location` geo_point.
+- Bulk indexes certificates CSV into an index (default: certificates).
 
 Usage examples (PowerShell):
 
@@ -161,15 +158,13 @@ def ingest_certificates(client: OpenSearch, csv_path: str, schema: Dict[str, Any
 
 def main(argv=None):
     p = argparse.ArgumentParser()
-    p.add_argument('--csv', default='certificates.csv', help='path to certificates.csv')
-    p.add_argument('--schema', default='schema.json', help='path to schema.json (CSVW)')
+    p.add_argument('--csv', default='domestic/certificates.csv', help='path to certificates.csv')
+    p.add_argument('--schema', default='domestic/schema.json', help='path to schema.json (CSVW)')
     p.add_argument('--opensearch-url', default=os.environ.get('OPENSEARCH_URL', 'http://localhost:9200'))
     p.add_argument('--user', default=os.environ.get('OPENSEARCH_USER'))
     p.add_argument('--password', default=os.environ.get('OPENSEARCH_PASS'))
-    p.add_argument('--index-certificates', default='domestic-2023-certificates')
-    p.add_argument('--index-properties', default='domestic-2023-properties')
-    p.add_argument('--batch-size', type=int, default=1000)
-    p.add_argument('--postcode-lookup', default=None, help='CSV with postcode,lat,lon to enrich location')
+    p.add_argument('--index', default='certificates')
+    p.add_argument('--batch-size', type=int, default=5000)
     args = p.parse_args(argv)
 
     schema_path = os.path.join(os.path.dirname(__file__), args.schema) if not os.path.isabs(args.schema) else args.schema
@@ -178,7 +173,7 @@ def main(argv=None):
 
     client = OpenSearch([args.opensearch_url], http_auth=(args.user, args.password) if args.user else None)
 
-    ingest_certificates(client, csv_path, schema, args.index_certificates, batch_size=args.batch_size)
+    ingest_certificates(client, csv_path, schema, args.index, batch_size=args.batch_size)
 
 
 if __name__ == '__main__':

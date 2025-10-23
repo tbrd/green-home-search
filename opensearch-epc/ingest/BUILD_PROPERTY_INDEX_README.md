@@ -129,8 +129,8 @@ python build_property_index.py \
   --opensearch-url http://localhost:9200 \
   --user admin \
   --password admin \
-  --cert-index domestic-2023-certificates \
-  --prop-index domestic-2023-properties \
+  --cert-index certificates \
+  --prop-index properties \
   --batch-size 500
 ```
 
@@ -140,8 +140,8 @@ python build_property_index.py `
   --opensearch-url http://localhost:9200 `
   --user admin `
   --password admin `
-  --cert-index domestic-2023-certificates `
-  --prop-index domestic-2023-properties `
+  --cert-index certificates `
+  --prop-index properties `
   --batch-size 500
 ```
 

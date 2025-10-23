@@ -184,7 +184,7 @@ def extract_latest_epc(cert: Dict[str, Any]) -> Dict[str, Any]:
     latest_epc['solar_panels'] = bool(photo_supply and float(photo_supply) > 0)
     
     # Check for solar water heating
-    solar_water = cert.get('SOLAR_WATER_HEATING_FLAG', '')
+    solar_water = cert.get('SOLAR_WATER_HEATING_FLAG', '') or ''
     latest_epc['solar_water_heating'] = solar_water.upper() in ('Y', 'YES', 'TRUE')
     
     return latest_epc
@@ -254,31 +254,73 @@ def build_property_document(uprn: str, certificates: List[Dict[str, Any]]) -> Di
     return property_doc
 
 
-def fetch_all_certificates_by_uprn(client: OpenSearch, cert_index: str, uprn: str) -> List[Dict[str, Any]]:
+def fetch_all_certificates_in_batches(client: OpenSearch, cert_index: str) -> Dict[str, List[Dict[str, Any]]]:
     """
-    Fetch all certificates for a given UPRN, sorted by lodgement date descending.
+    Fetch all certificates from the index grouped by UPRN using scroll API.
+    This is much more efficient than querying for each UPRN individually.
     
     Args:
         client: OpenSearch client
         cert_index: Name of the certificates index
-        uprn: The UPRN to fetch certificates for
         
     Returns:
-        List of certificate documents sorted by date (newest first)
+        Dictionary mapping UPRN to list of certificate documents (sorted by date, newest first)
     """
+    print('Fetching all certificates using scroll API...')
+    
     # Determine date field to use for sorting
     date_fields = ['LODGEMENT_DATETIME', 'LODGEMENT_DATE', 'INSPECTION_DATE']
     
     body = {
-        'query': {
-            'term': {'UPRN.keyword': uprn}
-        },
-        'sort': [{date_fields[0]: {'order': 'desc', 'missing': '_last'}}],
-        'size': 100  # Max 100 certificates per property (should be more than enough)
+        'query': {'match_all': {}},
+        'sort': [{'UPRN': 'asc'}, {date_fields[0]: {'order': 'desc', 'missing': '_last'}}],
+        'size': 10000  # Fetch 10k documents per scroll request
     }
     
-    result = client.search(index=cert_index, body=body)
-    return [hit['_source'] for hit in result['hits']['hits']]
+    # Dictionary to store certificates grouped by UPRN
+    certificates_by_uprn = {}
+    total_certs = 0
+    
+    # Initialize scroll
+    response = client.search(index=cert_index, body=body, scroll='5m')
+    scroll_id = response['_scroll_id']
+    
+    # Process first batch
+    hits = response['hits']['hits']
+    while hits:
+        for hit in hits:
+            cert = hit['_source']
+            uprn = cert.get('UPRN')
+            if uprn:
+                if uprn not in certificates_by_uprn:
+                    certificates_by_uprn[uprn] = []
+                certificates_by_uprn[uprn].append(cert)
+                total_certs += 1
+        
+        if total_certs % 100000 == 0:
+            print(f'  Processed {total_certs} certificates, {len(certificates_by_uprn)} unique UPRNs...')
+        
+        # Get next batch
+        response = client.scroll(scroll_id=scroll_id, scroll='5m')
+        scroll_id = response['_scroll_id']
+        hits = response['hits']['hits']
+    
+    # Clean up scroll
+    try:
+        client.clear_scroll(scroll_id=scroll_id)
+    except:
+        pass
+    
+    print(f'Fetched {total_certs} certificates for {len(certificates_by_uprn)} unique UPRNs')
+    
+    # Sort certificates within each UPRN by date (newest first)
+    # Already sorted by OpenSearch query, but we may have inserted out of order
+    for uprn, certs in certificates_by_uprn.items():
+        certs.sort(key=lambda c: (
+            c.get('LODGEMENT_DATETIME') or c.get('LODGEMENT_DATE') or c.get('INSPECTION_DATE') or ''
+        ), reverse=True)
+    
+    return certificates_by_uprn
 
 
 def build_properties_index(
@@ -310,61 +352,39 @@ def build_properties_index(
     client.indices.create(index=prop_index, body=mapping)
     print(f'Created properties index: {prop_index}')
     
-    # Use composite aggregation to page through all UPRNs
-    comp_source = [{'uprn': {'terms': {'field': 'UPRN.keyword'}}}]
-    after_key = None
+    # Fetch all certificates grouped by UPRN in one efficient operation
+    certificates_by_uprn = fetch_all_certificates_in_batches(client, cert_index)
+    
+    print(f'Building property documents and indexing in batches...')
+    
+    # Process all UPRNs and build property documents
+    actions = []
     total_props = 0
     
-    while True:
-        body = {
-            'size': 0,
-            'aggs': {
-                'by_uprn': {
-                    'composite': {
-                        'size': 1000,
-                        'sources': comp_source,
-                        **({'after': after_key} if after_key else {})
-                    }
-                }
+    for uprn, certificates in certificates_by_uprn.items():
+        # Build property document
+        prop_doc = build_property_document(uprn, certificates)
+        
+        if prop_doc:
+            action = {
+                '_index': prop_index,
+                '_id': str(uprn),
+                '_source': prop_doc
             }
-        }
-        
-        res = client.search(index=cert_index, body=body)
-        buckets = res['aggregations']['by_uprn']['buckets']
-        
-        if not buckets:
-            break
-        
-        # Process each UPRN
-        actions = []
-        for bucket in buckets:
-            uprn = bucket['key']['uprn']
+            actions.append(action)
             
-            # Fetch all certificates for this UPRN
-            certificates = fetch_all_certificates_by_uprn(client, cert_index, uprn)
-            
-            if certificates:
-                # Build property document
-                prop_doc = build_property_document(uprn, certificates)
-                
-                if prop_doc:
-                    action = {
-                        '_index': prop_index,
-                        '_id': str(uprn),
-                        '_source': prop_doc
-                    }
-                    actions.append(action)
-        
-        # Bulk index properties
-        if actions:
-            helpers.bulk(client, actions)
-            total_props += len(actions)
-            print(f'Indexed {total_props} properties...')
-        
-        # Check for more pages
-        after_key = res['aggregations']['by_uprn'].get('after_key')
-        if not after_key:
-            break
+            # Bulk index in batches
+            if len(actions) >= batch_size:
+                helpers.bulk(client, actions)
+                total_props += len(actions)
+                print(f'Indexed {total_props} properties...')
+                actions = []
+    
+    # Index remaining properties
+    if actions:
+        helpers.bulk(client, actions)
+        total_props += len(actions)
+        print(f'Indexed {total_props} properties...')
     
     print(f'Properties index build complete: {total_props} documents')
     return total_props
@@ -392,13 +412,13 @@ def main(argv=None):
     )
     parser.add_argument(
         '--cert-index',
-        default='domestic-2023-certificates',
-        help='Name of the certificates index (default: domestic-2023-certificates)'
+        default='certificates',
+        help='Name of the certificates index (default: certificates)'
     )
     parser.add_argument(
         '--prop-index',
-        default='domestic-2023-properties',
-        help='Name of the properties index to create (default: domestic-2023-properties)'
+        default='properties',
+        help='Name of the properties index to create (default: properties)'
     )
     parser.add_argument(
         '--batch-size',
