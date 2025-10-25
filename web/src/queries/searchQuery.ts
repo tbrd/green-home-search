@@ -38,7 +38,7 @@ export type Response = {
 	
 
 
-export const fetchSearch = async ({query: q, pageIndex = 0, pageSize = 10}: {query: {location: string | null, energyRating?: string}, pageIndex: number, pageSize?: number }): Promise<Response> => {
+export const fetchSearch = async ({query: q, pageIndex = 0, pageSize = 10}: {query: {location: string | null, energyRating?: string, sortBy?: string}, pageIndex: number, pageSize?: number }): Promise<Response> => {
 	if (!q.location) return { results: [] };
 
 	const searchParams = new URLSearchParams();
@@ -46,6 +46,9 @@ export const fetchSearch = async ({query: q, pageIndex = 0, pageSize = 10}: {que
 	searchParams.set('address', q.location);
 	if (q.energyRating) {
 		searchParams.set('energy_rating', q.energyRating);
+	}
+	if (q.sortBy) {
+		searchParams.set('sort_by', q.sortBy);
 	}
 	searchParams.set('offset', (pageIndex * pageSize).toString());
 	searchParams.set('limit', pageSize.toString());
