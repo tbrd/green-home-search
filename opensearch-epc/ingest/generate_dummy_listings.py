@@ -121,7 +121,7 @@ def estimate_bedrooms(prop: Dict[str, Any]) -> int:
     return random.randint(2, 4)
 
 
-def generate_listing_from_property(prop: Dict[str, Any], source: str = "dummy_gen") -> Dict[str, Any]:
+def generate_listing_from_property(prop: Dict[str, Any], source: str = "dummy_gen") -> Optional[Dict[str, Any]]:
     """
     Generate a realistic listing document from a property.
     
@@ -130,7 +130,7 @@ def generate_listing_from_property(prop: Dict[str, Any], source: str = "dummy_ge
         source: Listing source identifier
         
     Returns:
-        Listing document ready for indexing
+        Listing document ready for indexing, or None if UPRN is missing
     """
     uprn = prop.get('uprn')
     if not uprn:
@@ -297,7 +297,7 @@ def sample_properties_for_listings(
     # Clean up scroll
     try:
         client.clear_scroll(scroll_id=scroll_id)
-    except:
+    except Exception:
         pass
     
     print(f'Selected {len(sampled_properties):,} properties for listing')
