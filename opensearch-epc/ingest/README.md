@@ -140,3 +140,25 @@ Retention & scale:
 Analytics:
 - Common aggregations (counts by EPC band, main fuel, solar flags; avg price by EPC band; cost distributions) work directly on the listings index because EPC attributes are denormalized onto listings.
 - For property-only analytics, use the `properties` index. If you ever need complex cross-entity aggregations that can’t be denormalized, consider transforms or parent-child in a dedicated analytics index.
+
+
+Listing fields (v1) additions
+-----------------------------
+
+The dummy listings generator now includes a few extra presentational fields and pricing tweaks:
+
+- `offer_type` (keyword): one of `guide_price`, `offers_over`, `oieo` (offers in excess of), or `fixed_price`.
+- `tenure` (keyword): e.g., `freehold`, `leasehold`, `share_of_freehold` (heuristic based on property type).
+- `short_description` (text): a concise, human-readable summary.
+- `long_description` (text): a slightly longer marketing paragraph.
+
+Pricing improvements:
+
+- If `properties.last_sale` has `price` and `date`, we index that forward with a simple compound growth model (~4.5%/yr average) and blend with an EPC/size/type model for realism.
+- Otherwise we derive price from floor area, property type, EPC band, and a coarse postcode-area multiplier.
+
+To apply the new mapping, re-create the listings index:
+
+```powershell
+python .\create_listings_index.py --index listings-v1 --active-alias listings-active --all-alias listings-all --force
+```

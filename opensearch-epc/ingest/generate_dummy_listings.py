@@ -30,6 +30,47 @@ from opensearchpy import OpenSearch, helpers
 from ingest_listings import enrich_with_property
 
 
+def _years_between(start: datetime, end: datetime) -> float:
+    """Return fractional years between two datetimes."""
+    return (end - start).days / 365.25
+
+
+def _compound_growth_factor(annual_rate: float, years: float, clamp: Optional[tuple[float, float]] = (0.8, 2.2)) -> float:
+    """Compute compound growth factor with optional clamping."""
+    factor = (1.0 + annual_rate) ** max(years, 0.0)
+    if clamp:
+        lo, hi = clamp
+        factor = max(lo, min(hi, factor))
+    return factor
+
+
+def _region_price_factor_from_postcode(postcode: str) -> float:
+    """Very coarse regional multiplier derived from postcode area.
+
+    This is intentionally simple and offline-friendly. Adjust as needed.
+    """
+    if not postcode:
+        return 1.0
+    area = postcode.strip().upper().split(" ")[0][:2]
+    # Rough relative price levels
+    high = {"SW", "W", "NW", "N", "SE", "E", "EC", "WC"}  # London
+    south_east = {"HP", "SL", "RG", "OX", "GU", "KT", "BN", "RH", "ME", "TN"}
+    south = {"SO", "PO", "SP", "BH", "SN"}
+    east = {"CB", "CM", "CO", "IP", "NR"}
+    west = {"BS", "BA", "GL", "CF"}
+    if area in high:
+        return 1.60
+    if area in south_east:
+        return 1.25
+    if area in south:
+        return 1.15
+    if area in east:
+        return 1.10
+    if area in west:
+        return 1.05
+    return 1.0
+
+
 def estimate_price_from_property(prop: Dict[str, Any]) -> int:
     """
     Generate a realistic property price based on property characteristics.
@@ -40,20 +81,20 @@ def estimate_price_from_property(prop: Dict[str, Any]) -> int:
     Returns:
         Estimated price in GBP
     """
-    # Base price varies by property type and region
+    # Base price varies by property type
     base_prices = {
-        'House': 350000,
-        'Flat': 250000,
-        'Maisonette': 275000,
-        'Bungalow': 320000,
-        'Park home': 150000,
+        'House': 425000,
+        'Flat': 300000,
+        'Maisonette': 325000,
+        'Bungalow': 375000,
+        'Park home': 175000,
     }
     
     latest_epc = prop.get('latest_epc', {})
     property_type = latest_epc.get('property_type', 'House')
     
     # Get base price for property type
-    base_price = base_prices.get(property_type, 300000)
+    base_price = base_prices.get(property_type, 325000)
     
     # Adjust for floor area (if available)
     floor_area = latest_epc.get('total_floor_area')
@@ -70,22 +111,58 @@ def estimate_price_from_property(prop: Dict[str, Any]) -> int:
     # Adjust for EPC rating (better rating = higher value)
     epc_rating = latest_epc.get('rating', 'D')
     rating_multipliers = {
-        'A': 1.15,
-        'B': 1.10,
-        'C': 1.05,
+        'A': 1.12,
+        'B': 1.08,
+        'C': 1.04,
         'D': 1.0,
-        'E': 0.95,
-        'F': 0.90,
-        'G': 0.85,
+        'E': 0.96,
+        'F': 0.92,
+        'G': 0.88,
     }
     base_price = int(base_price * rating_multipliers.get(epc_rating, 1.0))
+
+    # Apply coarse regional factor from postcode
+    postcode = (prop.get('address') or {}).get('postcode', '')
+    base_price = int(base_price * _region_price_factor_from_postcode(postcode))
+
+    # If we have a last_sale price and date, index it forward using a simple HPI-like model
+    last_sale = prop.get('last_sale') or {}
+    last_price = last_sale.get('price')
+    last_date_str = last_sale.get('date')
+    if last_price and last_date_str:
+        last_dt = None
+        s = str(last_date_str)
+        for fmt in ('%Y-%m-%d', '%Y-%m', '%Y'):
+            try:
+                last_dt = datetime.strptime(s[:len(datetime.now().strftime(fmt))], fmt)
+                break
+            except Exception:
+                continue
+        if last_dt is None:
+            try:
+                # Last resort: take year prefix
+                last_dt = datetime(int(s[:4]), 7, 1)
+            except Exception:
+                last_dt = None
+
+        if last_dt is not None:
+            if last_dt.tzinfo is None:
+                last_dt = last_dt.replace(tzinfo=timezone.utc)
+            years = _years_between(last_dt, datetime.now(timezone.utc))
+            # Use 4.5% annual compound growth as a national average baseline since last sale
+            growth = _compound_growth_factor(annual_rate=0.045, years=years, clamp=(0.9, 2.4))
+            # Blend: 70% weight to indexed last sale, 30% to base model
+            indexed = int(int(last_price) * growth)
+            base_price = int(0.7 * indexed + 0.3 * base_price)
     
-    # Add some randomness (±10%)
-    variation = random.uniform(0.9, 1.1)
+    # Add modest randomness (±5%)
+    variation = random.uniform(0.95, 1.05)
     price = int(base_price * variation)
     
     # Round to nearest £1,000
     price = round(price / 1000) * 1000
+
+    price = price * 1.5  # Adjust for market conditions
     
     return max(price, 50000)  # Minimum price
 
@@ -122,6 +199,40 @@ def estimate_bedrooms(prop: Dict[str, Any]) -> int:
     
     # Default: random between 2-4
     return random.randint(2, 4)
+
+
+def _pick_tenure(property_type: str) -> str:
+    """Pick a plausible tenure based on property type."""
+    pt = (property_type or '').lower()
+    if 'flat' in pt or 'maisonette' in pt:
+        return random.choices(['leasehold', 'share_of_freehold', 'freehold'], weights=[80, 15, 5])[0]
+    if 'bungalow' in pt or 'house' in pt or pt == 'detached' or pt == 'semi-detached' or pt == 'terraced':
+        return random.choices(['freehold', 'leasehold'], weights=[90, 10])[0]
+    return 'freehold'
+
+
+def _pick_offer_type() -> str:
+    return random.choices(
+        ['guide_price', 'offers_over', 'oieo', 'fixed_price'],
+        weights=[60, 20, 15, 5]
+    )[0]
+
+
+def _make_descriptions(bedrooms: int, property_type: str, town: str, postcode: str, epc_rating: str) -> tuple[str, str]:
+    town_part = f", {town}" if town else ""
+    short = f"{bedrooms}-bed {property_type or 'home'} in{town_part} ({postcode})"
+    features = []
+    if epc_rating:
+        features.append(f"EPC {epc_rating}")
+    if bedrooms >= 4:
+        features.append("spacious rooms")
+    if bedrooms <= 2:
+        features.append("ideal for first-time buyers")
+    long = (
+        f"A well-presented {bedrooms}-bed {property_type or 'property'} located in{town_part}. "
+        f"Featuring {', '.join(features) if features else 'good natural light'} and convenient access to local amenities."
+    )
+    return short, long
 
 
 def generate_listing_from_property(prop: Dict[str, Any], source: str = "dummy_gen") -> Optional[Dict[str, Any]]:
@@ -168,6 +279,12 @@ def generate_listing_from_property(prop: Dict[str, Any], source: str = "dummy_ge
         address_line = address.get('address', 'Unknown Address')
     
     postcode = address.get('postcode', '')
+    town = address.get('address3') or address.get('address2') or ''
+    property_type = latest_epc.get('property_type', 'House')
+    epc_rating = latest_epc.get('rating') or ''
+    tenure = _pick_tenure(property_type)
+    offer_type = _pick_offer_type()
+    short_desc, long_desc = _make_descriptions(bedrooms, property_type, town, postcode, epc_rating)
     
     # Create base listing document with generated fields
     base_listing = {
@@ -182,6 +299,10 @@ def generate_listing_from_property(prop: Dict[str, Any], source: str = "dummy_ge
         'price': price,
         'currency': 'GBP',
         'bedrooms': bedrooms,
+        'tenure': tenure,
+        'offer_type': offer_type,
+        'short_description': short_desc,
+        'long_description': long_desc,
         'address_line': address_line,
         'postcode': postcode,
     }

@@ -32,6 +32,12 @@
       "bedrooms": { "type": "short" },
       "bathrooms": { "type": "short" },
       "tenure": { "type": "keyword" },
+      "offer_type": { "type": "keyword" },
+      "short_description": {
+        "type": "text",
+        "fields": { "keyword": { "type": "keyword", "ignore_above": 256 } }
+      },
+      "long_description": { "type": "text" },
 
       "url": { "type": "keyword", "doc_values": false },
       "media_urls": { "type": "keyword" },
