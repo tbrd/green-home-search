@@ -5,10 +5,11 @@ This folder contains:
 - `certificates.csv` — the raw EPC certificates CSV (downloaded from the source)
 - `schema.json` — CSVW schema describing the CSV columns
 - `ingest_domestic_2023.py` — a Python script to create mappings and bulk ingest into OpenSearch
-- `build_property_index.py` — a Python script to build a comprehensive property index from certificates (NEW)
-- `create_listings_index.py` — create versioned listings index and filtered aliases (NEW)
-- `listings-v1.mapping.json` — listings index mapping (NEW)
-- `ingest_listings.py` — skeleton to enrich and upsert listing docs (NEW)
+- `build_property_index.py` — a Python script to build a comprehensive property index from certificates
+- `create_listings_index.py` — create versioned listings index and filtered aliases
+- `listings-v1.mapping.json` — listings index mapping
+- `generate_dummy_listings.py` — generate realistic dummy listings from the properties index
+- `ingest_listings.py` — skeleton to enrich and upsert listing docs from external feed
 
 Requirements
 - Python 3.9+
@@ -74,7 +75,17 @@ Create the listings index and aliases:
 python .\create_listings_index.py --index listings-v1 --active-alias listings-active --all-alias listings-all --force
 ```
 
-Populate some listings (skeleton demo):
+Generate dummy listings from properties (recommended for testing):
+
+```powershell
+# Generate listings for 1% of properties (default)
+python .\generate_dummy_listings.py --properties-index properties --listings-index listings-v1 --percentage 1.0
+
+# Generate more listings (e.g., 5% of properties)
+python .\generate_dummy_listings.py --properties-index properties --listings-index listings-v1 --percentage 5.0
+```
+
+Or populate listings from a real feed (skeleton demo):
 
 ```powershell
 python .\ingest_listings.py --properties-index properties --listings-index listings-v1
