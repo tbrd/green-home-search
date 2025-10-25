@@ -30,7 +30,7 @@ from opensearchpy import OpenSearch, helpers
 def create_property_mapping() -> Dict[str, Any]:
     """
     Create the OpenSearch mapping for the properties index.
-    
+
     Returns:
         Mapping configuration for the properties index
     """
@@ -109,10 +109,10 @@ def create_property_mapping() -> Dict[str, Any]:
 def extract_address(cert: Dict[str, Any]) -> Dict[str, Any]:
     """
     Extract address information from a certificate.
-    
+
     Args:
         cert: Certificate document from OpenSearch
-        
+
     Returns:
         Address object with structured fields
     """
@@ -122,11 +122,11 @@ def extract_address(cert: Dict[str, Any]) -> Dict[str, Any]:
         'address3': cert.get('ADDRESS3', ''),
         'postcode': cert.get('POSTCODE', '')
     }
-    
+
     # Build full address from components
     parts = [address['address1'], address['address2'], address['address3'], address['postcode']]
     address['address'] = ', '.join([p for p in parts if p])
-    
+
     # Extract location if available
     if 'location' in cert and cert['location']:
         loc = cert['location']
@@ -142,17 +142,17 @@ def extract_address(cert: Dict[str, Any]) -> Dict[str, Any]:
                     address['long'] = float(parts[1])
             except (ValueError, AttributeError):
                 pass
-    
+
     return address
 
 
 def extract_latest_epc(cert: Dict[str, Any]) -> Dict[str, Any]:
     """
     Extract latest EPC information from the most recent certificate.
-    
+
     Args:
         cert: Certificate document from OpenSearch
-        
+
     Returns:
         Latest EPC object with key fields
     """
@@ -178,25 +178,25 @@ def extract_latest_epc(cert: Dict[str, Any]) -> Dict[str, Any]:
         'hot_water_cost_current': cert.get('HOT_WATER_COST_CURRENT'),
         'lighting_cost_current': cert.get('LIGHTING_COST_CURRENT')
     }
-    
+
     # Check for solar panels (PHOTO_SUPPLY > 0)
     photo_supply = cert.get('PHOTO_SUPPLY', 0)
     latest_epc['solar_panels'] = bool(photo_supply and float(photo_supply) > 0)
-    
+
     # Check for solar water heating
     solar_water = cert.get('SOLAR_WATER_HEATING_FLAG', '') or ''
     latest_epc['solar_water_heating'] = solar_water.upper() in ('Y', 'YES', 'TRUE')
-    
+
     return latest_epc
 
 
 def extract_epc_summary(cert: Dict[str, Any]) -> Dict[str, Any]:
     """
     Extract summary EPC information for the historical epcs array.
-    
+
     Args:
         cert: Certificate document from OpenSearch
-        
+
     Returns:
         EPC summary object with key fields
     """
@@ -212,20 +212,20 @@ def extract_epc_summary(cert: Dict[str, Any]) -> Dict[str, Any]:
 def build_property_document(uprn: str, certificates: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     Build a property document from a list of certificates for the same UPRN.
-    
+
     Args:
         uprn: The property UPRN
         certificates: List of certificate documents, should be sorted by date (newest first)
-        
+
     Returns:
         Property document ready for indexing
     """
     if not certificates:
         return None
-    
+
     # Use the latest (first) certificate for main details
     latest_cert = certificates[0]
-    
+
     property_doc = {
         'uprn': uprn,
         'address': extract_address(latest_cert),
@@ -233,11 +233,11 @@ def build_property_document(uprn: str, certificates: List[Dict[str, Any]]) -> Di
         'epcs': [extract_epc_summary(cert) for cert in certificates],
         'created_at': datetime.now(timezone.utc).isoformat()
     }
-    
+
     # Add location geo_point if available
     if 'location' in latest_cert and latest_cert['location']:
         property_doc['location'] = latest_cert['location']
-    
+
     # Calculate estimated running cost from current costs
     running_costs = [
         latest_cert.get('HEATING_COST_CURRENT', 0) or 0,
@@ -250,7 +250,7 @@ def build_property_document(uprn: str, certificates: List[Dict[str, Any]]) -> Di
             property_doc['estimated_running_cost'] = int(total_cost)
     except (ValueError, TypeError):
         pass
-    
+
     return property_doc
 
 
@@ -258,33 +258,33 @@ def fetch_all_certificates_in_batches(client: OpenSearch, cert_index: str) -> Di
     """
     Fetch all certificates from the index grouped by UPRN using scroll API.
     This is much more efficient than querying for each UPRN individually.
-    
+
     Args:
         client: OpenSearch client
         cert_index: Name of the certificates index
-        
+
     Returns:
         Dictionary mapping UPRN to list of certificate documents (sorted by date, newest first)
     """
     print('Fetching all certificates using scroll API...')
-    
+
     # Determine date field to use for sorting
     date_fields = ['LODGEMENT_DATETIME', 'LODGEMENT_DATE', 'INSPECTION_DATE']
-    
+
     body = {
         'query': {'match_all': {}},
         'sort': [{'UPRN': 'asc'}, {date_fields[0]: {'order': 'desc', 'missing': '_last'}}],
         'size': 10000  # Fetch 10k documents per scroll request
     }
-    
+
     # Dictionary to store certificates grouped by UPRN
     certificates_by_uprn = {}
     total_certs = 0
-    
+
     # Initialize scroll
     response = client.search(index=cert_index, body=body, scroll='5m')
     scroll_id = response['_scroll_id']
-    
+
     # Process first batch
     hits = response['hits']['hits']
     while hits:
@@ -296,30 +296,30 @@ def fetch_all_certificates_in_batches(client: OpenSearch, cert_index: str) -> Di
                     certificates_by_uprn[uprn] = []
                 certificates_by_uprn[uprn].append(cert)
                 total_certs += 1
-        
+
         if total_certs % 100000 == 0:
             print(f'  Processed {total_certs} certificates, {len(certificates_by_uprn)} unique UPRNs...')
-        
+
         # Get next batch
         response = client.scroll(scroll_id=scroll_id, scroll='5m')
         scroll_id = response['_scroll_id']
         hits = response['hits']['hits']
-    
+
     # Clean up scroll
     try:
         client.clear_scroll(scroll_id=scroll_id)
     except:
         pass
-    
+
     print(f'Fetched {total_certs} certificates for {len(certificates_by_uprn)} unique UPRNs')
-    
+
     # Sort certificates within each UPRN by date (newest first)
     # Already sorted by OpenSearch query, but we may have inserted out of order
     for uprn, certs in certificates_by_uprn.items():
         certs.sort(key=lambda c: (
             c.get('LODGEMENT_DATETIME') or c.get('LODGEMENT_DATE') or c.get('INSPECTION_DATE') or ''
         ), reverse=True)
-    
+
     return certificates_by_uprn
 
 
@@ -331,40 +331,40 @@ def build_properties_index(
 ) -> int:
     """
     Build the properties index from the certificates index.
-    
+
     Args:
         client: OpenSearch client
         cert_index: Name of the certificates index
         prop_index: Name of the properties index to create
         batch_size: Number of properties to index in each batch
-        
+
     Returns:
         Total number of properties indexed
     """
     print(f'Building properties index: {prop_index}')
-    
+
     # Create the properties index with proper mapping
     if client.indices.exists(index=prop_index):
         print(f'Warning: Properties index {prop_index} already exists. Deleting and recreating...')
         client.indices.delete(index=prop_index)
-    
+
     mapping = create_property_mapping()
     client.indices.create(index=prop_index, body=mapping)
     print(f'Created properties index: {prop_index}')
-    
+
     # Fetch all certificates grouped by UPRN in one efficient operation
     certificates_by_uprn = fetch_all_certificates_in_batches(client, cert_index)
-    
+
     print(f'Building property documents and indexing in batches...')
-    
+
     # Process all UPRNs and build property documents
     actions = []
     total_props = 0
-    
+
     for uprn, certificates in certificates_by_uprn.items():
         # Build property document
         prop_doc = build_property_document(uprn, certificates)
-        
+
         if prop_doc:
             action = {
                 '_index': prop_index,
@@ -372,20 +372,20 @@ def build_properties_index(
                 '_source': prop_doc
             }
             actions.append(action)
-            
+
             # Bulk index in batches
             if len(actions) >= batch_size:
                 helpers.bulk(client, actions)
                 total_props += len(actions)
                 print(f'Indexed {total_props} properties...')
                 actions = []
-    
+
     # Index remaining properties
     if actions:
         helpers.bulk(client, actions)
         total_props += len(actions)
         print(f'Indexed {total_props} properties...')
-    
+
     print(f'Properties index build complete: {total_props} documents')
     return total_props
 
@@ -426,9 +426,9 @@ def main(argv=None):
         default=500,
         help='Batch size for bulk indexing (default: 500)'
     )
-    
+
     args = parser.parse_args(argv)
-    
+
     # Create OpenSearch client
     client = OpenSearch(
         [args.opensearch_url],
@@ -437,13 +437,13 @@ def main(argv=None):
         verify_certs=False,  # Disable for local dev; enable in production
         ssl_show_warn=False
     )
-    
+
     # Check if certificates index exists
     if not client.indices.exists(index=args.cert_index):
         print(f'Error: Certificates index "{args.cert_index}" does not exist.')
         print('Please run ingest_domestic_2023.py first to create the certificates index.')
         return 1
-    
+
     # Build the properties index
     try:
         build_properties_index(

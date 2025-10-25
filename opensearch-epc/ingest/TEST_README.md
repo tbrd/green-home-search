@@ -46,14 +46,14 @@ C:/code/green-home-search/api/.venv/Scripts/python.exe -m pytest . --cov=ingest_
 
 The test suite covers:
 
-✅ **Schema Loading**: Validates schema file parsing and error handling  
-✅ **Type Conversion**: Tests CSVW to OpenSearch type mapping  
-✅ **Value Parsing**: Tests CSV value parsing with various data types  
-✅ **Index Operations**: Tests OpenSearch index creation and management (mocked)  
-✅ **Data Ingestion**: Tests bulk indexing operations (mocked)  
-✅ **Command Line Interface**: Tests argument parsing and main workflow  
-✅ **Integration**: End-to-end testing with realistic sample data  
-✅ **Error Handling**: Tests error conditions and edge cases  
+✅ **Schema Loading**: Validates schema file parsing and error handling
+✅ **Type Conversion**: Tests CSVW to OpenSearch type mapping
+✅ **Value Parsing**: Tests CSV value parsing with various data types
+✅ **Index Operations**: Tests OpenSearch index creation and management (mocked)
+✅ **Data Ingestion**: Tests bulk indexing operations (mocked)
+✅ **Command Line Interface**: Tests argument parsing and main workflow
+✅ **Integration**: End-to-end testing with realistic sample data
+✅ **Error Handling**: Tests error conditions and edge cases
 
 ## Mocking Strategy
 

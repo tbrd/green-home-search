@@ -22,6 +22,8 @@ export interface Result {
 	current_energy_rating?: string;
 	energy_rating?: string;
 
+	running_cost?: number;
+
 	// allow other fields
 	[key: string]: unknown;
 }
@@ -35,14 +37,14 @@ export type Response = {
 	offset?: number;
 	limit?: number;
 }
-	
+
 
 
 export const fetchSearch = async ({query: q, pageIndex = 0, pageSize = 10}: {query: {location: string | null, energyRating?: string}, pageIndex: number, pageSize?: number }): Promise<Response> => {
 	if (!q.location) return { results: [] };
 
 	const searchParams = new URLSearchParams();
-	
+
 	searchParams.set('address', q.location);
 	if (q.energyRating) {
 		searchParams.set('energy_rating', q.energyRating);
@@ -75,4 +77,3 @@ export const fetchSearch = async ({query: q, pageIndex = 0, pageSize = 10}: {que
 
 	return payload;
 }
-

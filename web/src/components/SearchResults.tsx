@@ -34,7 +34,7 @@ const SearchResults: React.FC<{ query: { location: string | null; energyRating?:
 					<thead>
 						<tr>
 							<th>Address</th>
-							<th>EPC Rating</th>					
+							<th>EPC Rating</th>
 							<th>Running Cost</th>
 						</tr>
 					</thead>
@@ -48,7 +48,7 @@ const SearchResults: React.FC<{ query: { location: string | null; energyRating?:
 						))}
 					</tbody>
 				</table>
-				
+
 
 				<ul style={{ listStyle: 'none', padding: 0, display: 'flex', gap: '16px', marginTop: '16px' }}>
 					<li>Total results: {total}</li>
@@ -56,7 +56,7 @@ const SearchResults: React.FC<{ query: { location: string | null; energyRating?:
 					<li>Limit: {limit}</li>
 					<li>Search took: {took} ms</li>
 				</ul>
-					
+
 
 				Current page: {pageIndex + 1} of {Math.ceil((total ?? 0) / (limit ?? 10))}
 				<button onClick={() => setPageIndex((p) => Math.max(0, p - 1))} disabled={pageIndex === 0}>Previous</button>

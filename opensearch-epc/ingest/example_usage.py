@@ -23,7 +23,7 @@ from build_property_index import (
 def example_extract_address():
     """Example: Extract address from a certificate."""
     print("\n=== Example: Extract Address ===")
-    
+
     cert = {
         'ADDRESS1': '12 Rosevale Gardens',
         'ADDRESS2': 'Piddington',
@@ -31,7 +31,7 @@ def example_extract_address():
         'POSTCODE': 'HP13 3HH',
         'location': {'lat': 51.501, 'lon': -0.141}
     }
-    
+
     address = extract_address(cert)
     print(json.dumps(address, indent=2))
 
@@ -39,7 +39,7 @@ def example_extract_address():
 def example_extract_latest_epc():
     """Example: Extract latest EPC information."""
     print("\n=== Example: Extract Latest EPC ===")
-    
+
     cert = {
         'LMK_KEY': '4938aef',
         'CURRENT_ENERGY_RATING': 'B',
@@ -58,7 +58,7 @@ def example_extract_latest_epc():
         'HOT_WATER_COST_CURRENT': 350.0,
         'LIGHTING_COST_CURRENT': 200.0
     }
-    
+
     latest_epc = extract_latest_epc(cert)
     print(json.dumps(latest_epc, indent=2, default=str))
 
@@ -66,7 +66,7 @@ def example_extract_latest_epc():
 def example_build_property_document():
     """Example: Build a complete property document."""
     print("\n=== Example: Build Property Document ===")
-    
+
     # Multiple certificates for the same property (sorted newest first)
     certificates = [
         {
@@ -104,7 +104,7 @@ def example_build_property_document():
             'LODGEMENT_DATE': '2015-04-10'
         }
     ]
-    
+
     property_doc = build_property_document('123456789', certificates)
     print(json.dumps(property_doc, indent=2, default=str))
 
@@ -112,17 +112,17 @@ def example_build_property_document():
 def example_query_properties():
     """Example: Query the properties index."""
     print("\n=== Example: Query Properties Index ===")
-    
+
     # This example assumes OpenSearch is running and properties index exists
     # Uncomment to run against a real OpenSearch instance
-    
+
     """
     client = OpenSearch(
         ['http://localhost:9200'],
         http_auth=('admin', 'admin'),
         use_ssl=False
     )
-    
+
     # Query 1: Find properties with high energy ratings
     query = {
         'query': {
@@ -130,10 +130,10 @@ def example_query_properties():
         },
         'size': 10
     }
-    
+
     result = client.search(index='domestic-2023-properties', body=query)
     print(f"Found {result['hits']['total']['value']} properties with rating A")
-    
+
     # Query 2: Find properties with solar panels
     query = {
         'query': {
@@ -141,10 +141,10 @@ def example_query_properties():
         },
         'size': 10
     }
-    
+
     result = client.search(index='domestic-2023-properties', body=query)
     print(f"Found {result['hits']['total']['value']} properties with solar panels")
-    
+
     # Query 3: Find properties near a location
     query = {
         'query': {
@@ -159,11 +159,11 @@ def example_query_properties():
         },
         'size': 10
     }
-    
+
     result = client.search(index='domestic-2023-properties', body=query)
     print(f"Found {result['hits']['total']['value']} properties within 5km")
     """
-    
+
     print("Query examples (commented out - uncomment to run against OpenSearch):")
     print("1. Find properties with rating A")
     print("2. Find properties with solar panels")
@@ -175,12 +175,12 @@ def main():
     print("=" * 60)
     print("Property Index Builder - Usage Examples")
     print("=" * 60)
-    
+
     example_extract_address()
     example_extract_latest_epc()
     example_build_property_document()
     example_query_properties()
-    
+
     print("\n" + "=" * 60)
     print("For more information, see BUILD_PROPERTY_INDEX_README.md")
     print("=" * 60)

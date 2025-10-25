@@ -18,7 +18,7 @@ from ingest_domestic_2023 import main
 
 def test_integration_full_workflow():
     """Test the complete workflow with sample data files."""
-    
+
     # Create sample schema
     schema_data = {
         "tables": [{
@@ -122,7 +122,7 @@ def test_integration_full_workflow():
             }
         }]
     }
-    
+
     # Create sample CSV data
     csv_data = [
         {
@@ -314,33 +314,33 @@ def test_integration_full_workflow():
             "UPRN_SOURCE": "Address matched from ONS UPRN Directory"
         }
     ]
-    
+
     with tempfile.TemporaryDirectory() as temp_dir:
         # Write schema file
         schema_file = Path(temp_dir) / "schema.json"
         with open(schema_file, 'w') as f:
             json.dump(schema_data, f, indent=2)
-        
+
         # Write CSV file
         csv_file = Path(temp_dir) / "certificates.csv"
         with open(csv_file, 'w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=csv_data[0].keys())
             writer.writeheader()
             writer.writerows(csv_data)
-        
+
         # Mock OpenSearch client and all its methods
         with unittest.mock.patch('ingest_domestic_2023.OpenSearch') as mock_opensearch_class:
             mock_client = unittest.mock.MagicMock()
             mock_opensearch_class.return_value = mock_client
-            
+
             # Mock indices operations
             mock_client.indices.exists.return_value = False
             mock_client.indices.create.return_value = {'acknowledged': True}
-            
+
             # Mock bulk operations
             with unittest.mock.patch('ingest_domestic_2023.helpers') as mock_helpers:
                 mock_helpers.bulk.return_value = (2, [])  # Success response
-                
+
                 # Test basic ingestion
                 args = [
                     '--csv', str(csv_file),
@@ -351,23 +351,23 @@ def test_integration_full_workflow():
                     '--user', 'admin',
                     '--password', 'admin'
                 ]
-                
+
                 # Run main function
                 main(args)
-                
+
                 # Verify OpenSearch client was created with correct parameters
                 mock_opensearch_class.assert_called_once_with(
-                    ['http://localhost:9200'], 
+                    ['http://localhost:9200'],
                     http_auth=('admin', 'admin')
                 )
-                
+
                 # Verify index creation was attempted
                 mock_client.indices.exists.assert_called_with(index='test-certificates')
                 mock_client.indices.create.assert_called_once()
-                
+
                 # Verify bulk operations were called (should be called twice due to batch_size=1)
                 assert mock_helpers.bulk.call_count >= 2
-                
+
                 # Check that the bulk actions contain the correct data
                 call_args_list = mock_helpers.bulk.call_args_list
                 for call_args in call_args_list:
@@ -375,14 +375,14 @@ def test_integration_full_workflow():
                     assert client == mock_client
                     assert isinstance(actions, list)
                     assert len(actions) > 0
-                    
+
                     # Check first action structure
                     action = actions[0]
                     assert '_index' in action
                     assert '_source' in action
                     assert '_id' in action  # Should use LMK_KEY as ID
                     assert action['_index'] == 'test-certificates'
-                    
+
                     # Check that data was parsed correctly
                     source = action['_source']
                     assert 'LMK_KEY' in source
@@ -394,7 +394,7 @@ def test_integration_full_workflow():
 
 def test_integration_with_properties_index():
     """Test the complete workflow including properties index building."""
-    
+
     # Minimal schema for this test
     schema_data = {
         "tables": [{
@@ -409,7 +409,7 @@ def test_integration_with_properties_index():
             }
         }]
     }
-    
+
     csv_data = [
         {
             "LMK_KEY": "123",
@@ -418,25 +418,25 @@ def test_integration_with_properties_index():
             "ADDRESS": "123 Test St"
         }
     ]
-    
+
     with tempfile.TemporaryDirectory() as temp_dir:
         schema_file = Path(temp_dir) / "schema.json"
         csv_file = Path(temp_dir) / "certificates.csv"
-        
+
         with open(schema_file, 'w') as f:
             json.dump(schema_data, f)
-        
+
         with open(csv_file, 'w', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=csv_data[0].keys())
             writer.writeheader()
             writer.writerows(csv_data)
-        
+
         with unittest.mock.patch('ingest_domestic_2023.OpenSearch') as mock_opensearch_class:
             mock_client = unittest.mock.MagicMock()
             mock_opensearch_class.return_value = mock_client
             mock_client.indices.exists.return_value = False
             mock_client.indices.create.return_value = {'acknowledged': True}
-            
+
             # Mock search for properties index building
             mock_client.search.return_value = {
                 'aggregations': {
@@ -446,10 +446,10 @@ def test_integration_with_properties_index():
                     }
                 }
             }
-            
+
             with unittest.mock.patch('ingest_domestic_2023.helpers') as mock_helpers:
                 mock_helpers.bulk.return_value = (1, [])
-                
+
                 args = [
                     '--csv', str(csv_file),
                     '--schema', str(schema_file),
@@ -457,9 +457,9 @@ def test_integration_with_properties_index():
                     '--index-certificates', 'test-certs',
                     '--index-properties', 'test-props'
                 ]
-                
+
                 main(args)
-                
+
                 # Verify both indices were created
                 assert mock_client.indices.create.call_count == 2  # certificates + properties
 
