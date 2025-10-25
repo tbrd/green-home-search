@@ -17,17 +17,26 @@ const ListingsResults: React.FC<Props> = ({ query, searchTrigger, pageSize = 20 
     setPageIndex(0);
   }, [searchTrigger]);
 
+<<<<<<< HEAD
+=======
+  // Determine when a query is actually valid to run
+  const hasText = !!query?.q && String(query.q).trim().length > 0;
+  const hasGeo = query?.lat != null && query?.lon != null;
+>>>>>>> 612a438 (Resolve merge conflicts with main branch)
 
   const { isPending, isError, error, data, isFetching } = useQuery<ListingsResponse, Error>({
     queryKey: ['listings', query, pageIndex, sortBy, searchTrigger],
     queryFn: () => fetchActiveListings({ query: {...query, sortBy}, pageIndex, pageSize }),
-    enabled: !!query,
+    enabled: hasText || hasGeo,
     placeholderData: keepPreviousData,
   });
 
+<<<<<<< HEAD
   const hasText = !!query?.q && String(query.q).trim().length > 0;
   const hasGeo = query?.lat != null && query?.lon != null;
 
+=======
+>>>>>>> 612a438 (Resolve merge conflicts with main branch)
   // A minimal guard: show prompt when neither q nor lat/lon provided
   if (!hasText && !hasGeo) {
     return <div>Enter a postcode or provide a map location to search listings.</div>;
