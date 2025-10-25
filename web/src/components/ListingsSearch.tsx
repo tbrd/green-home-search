@@ -13,10 +13,14 @@ const ListingsSearch: React.FC<ListingsSearchProps> = ({ onSearch }) => {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         
+        // Parse and validate price inputs
+        const parsedMinPrice = minPrice ? parseFloat(minPrice) : null;
+        const parsedMaxPrice = maxPrice ? parseFloat(maxPrice) : null;
+        
         const query: ListingsQuery = {
             q: q || null,
-            minPrice: minPrice ? parseFloat(minPrice) : null,
-            maxPrice: maxPrice ? parseFloat(maxPrice) : null,
+            minPrice: parsedMinPrice !== null && !isNaN(parsedMinPrice) ? parsedMinPrice : null,
+            maxPrice: parsedMaxPrice !== null && !isNaN(parsedMaxPrice) ? parsedMaxPrice : null,
         };
         
         onSearch(query);
