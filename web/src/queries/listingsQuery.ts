@@ -62,6 +62,8 @@ export type ListingsQuery = {
   solarPanels?: boolean | null;
   solarWaterHeating?: boolean | null;
   runningCostMonthlyMax?: number | null;
+  minPrice?: number | null;
+  maxPrice?: number | null;
 
   // behavior
   collapsePerProperty?: boolean | null; // defaults true on API
@@ -90,6 +92,8 @@ export const fetchActiveListings = async ({ query, pageIndex = 0, pageSize = 20 
   if (query.solarPanels != null) searchParams.set('solar_panels', String(query.solarPanels));
   if (query.solarWaterHeating != null) searchParams.set('solar_water_heating', String(query.solarWaterHeating));
   if (query.runningCostMonthlyMax != null) searchParams.set('running_cost_monthly_max', String(query.runningCostMonthlyMax));
+  if (query.minPrice != null) searchParams.set('min_price', String(query.minPrice));
+  if (query.maxPrice != null) searchParams.set('max_price', String(query.maxPrice));
 
   // behavior
   if (query.collapsePerProperty != null) searchParams.set('collapse_per_property', String(query.collapsePerProperty));
