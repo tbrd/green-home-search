@@ -70,10 +70,14 @@ export const fetchSearch = async ({query: q, pageIndex = 0, pageSize = 10}: {que
 	const text = await res.text().catch(() => '');
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	let payload: Response | null = null;
 	try {
 		payload = text ? (JSON.parse(text) as Response) : null;
 =======
+=======
+	// Handle unknown JSON response structure from API
+>>>>>>> ab6da73 (Add justification comments for ESLint disable directives)
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	let payload: any = null;
 	try {
