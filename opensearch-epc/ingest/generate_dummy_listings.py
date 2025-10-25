@@ -26,6 +26,9 @@ from typing import Dict, Any, List, Optional
 
 from opensearchpy import OpenSearch, helpers
 
+# Import enrichment function from ingest_listings
+from ingest_listings import enrich_with_property
+
 
 def estimate_price_from_property(prop: Dict[str, Any]) -> int:
     """
@@ -166,8 +169,8 @@ def generate_listing_from_property(prop: Dict[str, Any], source: str = "dummy_ge
     
     postcode = address.get('postcode', '')
     
-    # Create listing document
-    listing = {
+    # Create base listing document with generated fields
+    base_listing = {
         'listing_id': f'{source}:{uprn}',
         'property_id': uprn,
         'source': source,
@@ -185,38 +188,16 @@ def generate_listing_from_property(prop: Dict[str, Any], source: str = "dummy_ge
     
     # Add location if available
     if prop.get('location'):
-        listing['location'] = prop['location']
+        base_listing['location'] = prop['location']
     elif address.get('lat') and address.get('long'):
-        listing['location'] = {
+        base_listing['location'] = {
             'lat': address['lat'],
             'lon': address['long']
         }
     
-    # Enrich with EPC data
-    if latest_epc.get('main_fuel'):
-        listing['main_fuel'] = latest_epc['main_fuel']
-    
-    if latest_epc.get('solar_panels') is not None:
-        listing['solar_panels'] = latest_epc['solar_panels']
-    
-    if latest_epc.get('solar_water_heating') is not None:
-        listing['solar_water_heating'] = latest_epc['solar_water_heating']
-    
-    if latest_epc.get('rating'):
-        listing['epc_rating'] = latest_epc['rating']
-    
-    if latest_epc.get('score'):
-        listing['epc_score'] = latest_epc['score']
-    
-    # Add running costs if available
-    estimated_cost = prop.get('estimated_running_cost')
-    if estimated_cost:
-        try:
-            annual_cost = float(estimated_cost)
-            listing['running_cost_annual'] = annual_cost
-            listing['running_cost_monthly'] = round(annual_cost / 12.0, 2)
-        except (ValueError, TypeError):
-            pass
+    # Use enrich_with_property() from ingest_listings to add EPC data
+    # This ensures consistency with the real listing ingestion workflow
+    listing = enrich_with_property(base_listing, prop)
     
     return listing
 
