@@ -11,17 +11,19 @@ const SearchResults: React.FC<{ query: { location: string | null; energyRating?:
 		setPageIndex(0);
 	}, [searchTrigger]);
 
-	const { isLoading, error, data} = useQuery<Response, Error>({
+
+	const hasText = !!query.location && String(query.location).trim().length > 0;
+	const { isPending, isError, error, data, isFetching } = useQuery<Response, Error>({
 		queryKey: ['search', query, pageIndex, searchTrigger],
 		queryFn: () => fetchSearch({query, pageIndex, pageSize: PAGE_SIZE}),
-		enabled: !!query,
+		enabled: hasText,
 		placeholderData: keepPreviousData,
 	});
 
 
-	if (!query.location) return <div>Enter a postcode to search.</div>
-	if (isLoading) return <div>Searching...</div>
-	if (error) return <div>Error: {error.message}</div>
+	if (!hasText) return <div>Enter a postcode to search.</div>
+	if (isPending || (isFetching && !data)) return <div>Searching...</div>
+	if (isError) return <div>Error: {error.message}</div>
 
 	const { results, total, took, offset, limit } = data ?? {results: []}
 	const nextPageExists = (offset ?? 0) + (limit ?? 0) < (total ?? 0);
