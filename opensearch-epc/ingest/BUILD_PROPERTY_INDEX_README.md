@@ -241,31 +241,31 @@ For large datasets (millions of properties), consider:
 ## Workflow
 
 1. First, ingest certificates using `ingest_domestic_2023.py`:
-   
+
    **Bash/Linux/macOS:**
    ```bash
    python ingest_domestic_2023.py --csv certificates.csv --schema schema.json
    ```
-   
+
    **PowerShell/Windows:**
    ```powershell
    python ingest_domestic_2023.py --csv certificates.csv --schema schema.json
    ```
 
 2. Then, build the properties index:
-   
+
    **Bash/Linux/macOS:**
    ```bash
    python build_property_index.py
    ```
-   
+
    **PowerShell/Windows:**
    ```powershell
    python build_property_index.py
    ```
 
 3. Query the properties index for specific properties or search by criteria:
-   
+
    **Bash/Linux/macOS:**
    ```bash
    # Example: Find properties with high energy ratings
@@ -277,7 +277,7 @@ For large datasets (millions of properties), consider:
        }
      }'
    ```
-   
+
    **PowerShell/Windows:**
    ```powershell
    # Example: Find properties with high energy ratings

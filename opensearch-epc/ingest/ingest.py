@@ -116,7 +116,7 @@ def ingest_certificates(client: OpenSearch, csv_path: str, schema: Dict[str, Any
     actions = []
     total = 0
     processed = 0
-    
+
     with open(csv_path, newline='', encoding='utf-8') as fh:
         reader = csv.DictReader(fh)
         for row in reader:
@@ -124,7 +124,7 @@ def ingest_certificates(client: OpenSearch, csv_path: str, schema: Dict[str, Any
             doc: Dict[str, Any] = {}
             for col, dtype in schema['columns'].items():
                 raw = row.get(col)
-                doc[col] = parse_value(raw, dtype)    
+                doc[col] = parse_value(raw, dtype)
             # determine id: use LMK_KEY (primary) if present
             doc_id = None
             if 'LMK_KEY' in doc and doc['LMK_KEY']:
@@ -133,7 +133,7 @@ def ingest_certificates(client: OpenSearch, csv_path: str, schema: Dict[str, Any
             if doc_id:
                 action['_id'] = doc_id
             actions.append(action)
-            
+
             if len(actions) >= batch_size:
                 try:
                     helpers.bulk(client, actions, chunk_size=batch_size, max_retries=3, request_timeout=60)
@@ -144,7 +144,7 @@ def ingest_certificates(client: OpenSearch, csv_path: str, schema: Dict[str, Any
                     print(f'Error indexing batch: {e}')
                     # Continue with next batch
                     actions.clear()
-                    
+
     if actions:
         try:
             helpers.bulk(client, actions, chunk_size=batch_size, max_retries=3, request_timeout=60)

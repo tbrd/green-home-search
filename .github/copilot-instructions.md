@@ -5,7 +5,7 @@
 This is a three-tier energy efficiency search platform for UK domestic properties using EPC (Energy Performance Certificate) data:
 
 - **`opensearch-epc/`** - Data ingestion pipeline for EPC CSV data into OpenSearch cluster
-- **`api/`** - FastAPI backend that queries OpenSearch and proxies to external EPC APIs  
+- **`api/`** - FastAPI backend that queries OpenSearch and proxies to external EPC APIs
 - **`web/`** - React/TypeScript frontend with Vite dev server and TanStack Query
 
 ## Architecture Patterns
@@ -34,7 +34,7 @@ python -m venv .venv; .\.venv\Scripts\Activate.ps1
 pip install opensearch-py
 python ingest_domestic_2023.py --csv certificates.csv --schema schema.json
 
-# 3. Start API server  
+# 3. Start API server
 cd ../../api
 python -m venv .venv; .\.venv\Scripts\Activate.ps1; pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
@@ -56,7 +56,7 @@ npm install; npm run dev  # Runs on :5173 with API proxy
 # Standard search response structure (api/main.py)
 {
     "query": str,
-    "total": int, 
+    "total": int,
     "results": [Result],
     "took": int,
     "offset": int,
@@ -83,7 +83,7 @@ interface Result {
 }
 ```
 
-### OpenSearch Index Strategy  
+### OpenSearch Index Strategy
 - **`domestic-2023-certificates`** - Raw certificate documents (one per certificate)
 - **`domestic-2023-properties`** - Aggregated by UPRN (latest certificate per property)
 - **Schema-driven mapping** - `schema.json` (CSVW format) auto-generates field types
@@ -95,7 +95,7 @@ interface Result {
 ```powershell
 # API (optional - falls back to local OpenSearch)
 $env:OPENSEARCH_URL = 'http://localhost:9200'
-$env:OPENSEARCH_USER = 'admin'  
+$env:OPENSEARCH_USER = 'admin'
 $env:OPENSEARCH_PASS = 'admin'
 $env:CERTIFICATES_INDEX = 'domestic-2023-certificates'
 
@@ -111,7 +111,7 @@ VITE_API_BASE=/api  # Proxy target for API calls
 
 ### Adding New Search Filters
 1. **Backend**: Add query parameter to `/search` endpoint in `api/main.py`
-2. **OpenSearch**: Update query builder to include filter clause  
+2. **OpenSearch**: Update query builder to include filter clause
 3. **Frontend**: Extend `SearchQuery` interface and `LocationSearch.tsx` form
 4. **Types**: Update `Result` interface if response fields change
 

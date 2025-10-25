@@ -22,8 +22,10 @@ export interface Result {
 	current_energy_rating?: string;
 	energy_rating?: string;
 
+	running_cost?: number;
+
 	// allow other fields
-	[key: string]: any;
+	[key: string]: unknown;
 }
 
 export const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api';
@@ -35,14 +37,14 @@ export type Response = {
 	offset?: number;
 	limit?: number;
 }
-	
+
 
 
 export const fetchSearch = async ({query: q, pageIndex = 0, pageSize = 10}: {query: {location: string | null, energyRating?: string}, pageIndex: number, pageSize?: number }): Promise<Response> => {
 	if (!q.location) return { results: [] };
 
 	const searchParams = new URLSearchParams();
-	
+
 	searchParams.set('address', q.location);
 	if (q.energyRating) {
 		searchParams.set('energy_rating', q.energyRating);
@@ -66,16 +68,12 @@ export const fetchSearch = async ({query: q, pageIndex = 0, pageSize = 10}: {que
 
 	const text = await res.text().catch(() => '');
 
-	let payload: any = null;
+	let payload: Response;
 	try {
-		payload = text ? JSON.parse(text) : null;
-	} catch (e) {
+		payload = text ? JSON.parse(text) as Response : { results: [] };
+	} catch {
 		throw new Error(`Invalid JSON response`);
 	}
 
-	return {
-		...payload,
-
-	}
+	return payload;
 }
-

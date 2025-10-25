@@ -23,9 +23,9 @@ def main():
     p.add_argument('--user', default=os.environ.get('OPENSEARCH_USER', 'admin'))
     p.add_argument('--password', default=os.environ.get('OPENSEARCH_PASS', 'admin'))
     p.add_argument('--index-certificates', default='domestic-2023-certificates')
-    
+
     args = p.parse_args()
-    
+
     # OpenSearch client
     client = OpenSearch(
         hosts=[args.opensearch_url],
@@ -35,7 +35,7 @@ def main():
         ssl_assert_hostname=False,
         ssl_show_warn=False
     )
-    
+
     # Check current status
     cert_count = get_document_count(client, args.index_certificates)
     print(f"Certificates index ({args.index_certificates}): {cert_count:,} documents")
