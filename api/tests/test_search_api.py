@@ -1,6 +1,7 @@
 from pathlib import Path
 import sys
 import pytest
+import asyncio
 
 # ensure api root is importable
 ROOT = Path(__file__).resolve().parent.parent
@@ -19,28 +20,28 @@ def test_search_returns_results():
 
 
 def test_running_cost_with_valid_rating():
-    """Test running cost endpoint with valid EPC rating."""
-    epc_doc = {"current-energy-rating": "C"}
+    """Test running cost endpoint with valid cost data."""
+    epc_doc = {"HEATING_COST_CURRENT": 80, "HOT_WATER_COST_CURRENT": 20}
     result = asyncio.run(get_running_cost(epc_doc))
     assert result == {"running_cost": 100}
 
 
 def test_running_cost_with_different_rating():
-    """Test running cost endpoint with different valid rating."""
-    epc_doc = {"current-energy-rating": "A"}
+    """Test running cost endpoint with different valid costs."""
+    epc_doc = {"HEATING_COST_CURRENT": 30, "HOT_WATER_COST_CURRENT": 20}
     result = asyncio.run(get_running_cost(epc_doc))
     assert result == {"running_cost": 50}
 
 
 def test_running_cost_with_uppercase_field():
-    """Test running cost endpoint with uppercase field name."""
-    epc_doc = {"CURRENT_ENERGY_RATING": "E"}
+    """Test running cost endpoint with uppercase field names."""
+    epc_doc = {"HEATING_COST_CURRENT": 120, "HOT_WATER_COST_CURRENT": 30}
     result = asyncio.run(get_running_cost(epc_doc))
     assert result == {"running_cost": 150}
 
 
 def test_running_cost_with_invalid_rating():
-    """Test running cost endpoint with invalid rating."""
+    """Test running cost endpoint with missing cost data."""
     epc_doc = {"current-energy-rating": "Z"}
     result = asyncio.run(get_running_cost(epc_doc))
     assert result == {"running_cost": None}
@@ -86,9 +87,13 @@ def test_search_returns_results(client):
         assert "current_energy_rating" in first_result
         assert "property_type" in first_result
         assert "score" in first_result
+        assert "running_cost" in first_result
         
         # Check that score is a number
         assert isinstance(first_result["score"], (int, float))
+        
+        # Check that running_cost is either a number or None
+        assert first_result["running_cost"] is None or isinstance(first_result["running_cost"], (int, float))
 
 
 def test_search_with_filters(client):
@@ -176,3 +181,28 @@ def test_health_endpoint(client):
     assert "status" in data
     assert "opensearch" in data
     assert "indices" in data
+
+
+def test_search_includes_running_cost(client):
+    """Test that search results include running cost calculations."""
+    response = client.get("/search?address=High Wycombe&limit=10")
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Check that we have results
+    if data["total"] > 0 and len(data["results"]) > 0:
+        for result in data["results"]:
+            # Every result should have a running_cost field
+            assert "running_cost" in result
+            
+            # If the result has heating and hot water cost data, running_cost should be calculated
+            if result.get("heating_cost_current") is not None and result.get("hot_water_cost_current") is not None:
+                assert result["running_cost"] is not None
+                assert isinstance(result["running_cost"], (int, float))
+                # Running cost should be the sum of heating and hot water costs
+                expected_cost = result["heating_cost_current"] + result["hot_water_cost_current"]
+                assert result["running_cost"] == expected_cost
+            else:
+                # If cost data is missing, running_cost should be None
+                assert result["running_cost"] is None

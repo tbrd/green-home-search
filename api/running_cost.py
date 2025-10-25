@@ -7,50 +7,28 @@ monthly running costs based solely on the EPC (Energy Performance Certificate) r
 
 from typing import Dict, Any, Optional
 
-
-# Mapping of EPC ratings to monthly running costs in GBP
-EPC_RATING_COSTS = {
-    "A": 50,
-    "B": 75,
-    "C": 100,
-    "D": 125,
-    "E": 150,
-    "F": 175,
-    "G": 200,
-}
-
-
 def calculate_running_cost(epc_document: Dict[str, Any]) -> Optional[float]:
     """
-    Calculate monthly running cost based on EPC rating.
+    Calculate monthly running cost from EPC
     
     Args:
-        epc_document: A dictionary containing EPC data. Expected to have a
-                     'current-energy-rating' or 'CURRENT_ENERGY_RATING' field
-                     with a value from 'A' to 'G'.
+        epc_document: A dictionary containing EPC data. Expected to have 
+                     "HOT_WATER_COST_CURRENT" and "HEATING_COST_CURRENT" fields
     
     Returns:
         Monthly running cost in GBP, or None if the rating is not found or invalid.
     
-    Examples:
-        >>> calculate_running_cost({"current-energy-rating": "A"})
-        50
-        >>> calculate_running_cost({"CURRENT_ENERGY_RATING": "C"})
-        100
-        >>> calculate_running_cost({"current-energy-rating": "invalid"})
-        None
     """
     if not epc_document:
         return None
     
+    # todo: calculate based on actual cost data
+    # We could use ENERGY_CONSUMPTION_CURRENT is in kWh/m2 - possibly per annum
+    # Also need to consider energy prices, and the energy source (electricity/gas/oil/etc)
+    
     # Try both possible field names (hyphenated for API, uppercase for raw data)
-    rating = epc_document.get("current-energy-rating") or epc_document.get("CURRENT_ENERGY_RATING")
-    
-    if not rating:
-        return None
-    
-    # Normalize to uppercase and strip whitespace
-    rating = str(rating).upper().strip()
-    
+    hot_water_cost = epc_document.get("HOT_WATER_COST_CURRENT") 
+    heating_cost = epc_document.get("HEATING_COST_CURRENT")
+
     # Return the cost for the rating, or None if not found
-    return EPC_RATING_COSTS.get(rating)
+    return hot_water_cost + heating_cost if hot_water_cost is not None and heating_cost is not None else None

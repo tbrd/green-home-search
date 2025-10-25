@@ -26,7 +26,7 @@ logger = logging.getLogger("green-home-search.api")
 OPENSEARCH_URL = os.environ.get('OPENSEARCH_URL', 'http://localhost:9200')
 OPENSEARCH_USER = os.environ.get('OPENSEARCH_USER', 'admin')
 OPENSEARCH_PASS = os.environ.get('OPENSEARCH_PASS', 'admin')
-CERTIFICATES_INDEX = os.environ.get('CERTIFICATES_INDEX', 'domestic-2023-certificates')
+CERTIFICATES_INDEX = os.environ.get('CERTIFICATES_INDEX', 'certificates')
 
 # Initialize OpenSearch client
 opensearch_client = OpenSearch(
@@ -189,7 +189,8 @@ async def search(
                 "construction_age_band": source.get('CONSTRUCTION_AGE_BAND'),
                 "tenure": source.get('TENURE'),
                 "main_fuel": source.get('MAIN_FUEL'),
-                "score": hit['_score']
+                "score": hit['_score'],
+                "running_cost": calculate_running_cost(source)
             }
             properties.append(property_data)
         
