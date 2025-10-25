@@ -6,6 +6,9 @@ This folder contains:
 - `schema.json` — CSVW schema describing the CSV columns
 - `ingest_domestic_2023.py` — a Python script to create mappings and bulk ingest into OpenSearch
 - `build_property_index.py` — a Python script to build a comprehensive property index from certificates (NEW)
+- `create_listings_index.py` — create versioned listings index and filtered aliases (NEW)
+- `listings-v1.mapping.json` — listings index mapping (NEW)
+- `ingest_listings.py` — skeleton to enrich and upsert listing docs (NEW)
 
 Requirements
 - Python 3.9+
@@ -57,3 +60,72 @@ Notes & recommendations
 - For faster bulk imports temporarily set `number_of_replicas` to 0 and `refresh_interval` to `-1` on the target index, then restore them after the bulk load.
 - If you have a postcode->lat/lon lookup CSV, pass `--postcode-lookup path/to/postcodes.csv` to populate a `location` geo_point from postcodes.
 - The mapping is inferred from `schema.json` and includes a `location` geo_point. You may want to refine mappings for numeric/date fields after inspecting sample documents.
+
+
+Listings (NEW)
+---------------
+
+We store property sales/rental listings in a dedicated index, linked to the properties index via `property_id` (UPRN). Only a small subset of property fields (fuel type, EPC rating/score, solar flags, running costs, location) are denormalized onto the listing for fast queries.
+
+Create the listings index and aliases:
+
+```powershell
+# Uses OPENSEARCH_URL/USER/PASS env vars if set
+python .\create_listings_index.py --index listings-v1 --active-alias listings-active --all-alias listings-all --force
+```
+
+Populate some listings (skeleton demo):
+
+```powershell
+python .\ingest_listings.py --properties-index properties --listings-index listings-v1
+```
+
+Index/aliases:
+- `listings-v1` — concrete index (versioned)
+- `listings-active` — filtered alias (is_active=true) for default searches
+- `listings-all` — alias including active and expired for history
+
+Search examples (HTTP):
+
+```json
+POST listings-active/_search
+{
+	"size": 20,
+	"query": {
+		"bool": {
+			"filter": [
+				{ "geo_distance": { "distance": "10km", "location": { "lat": 51.5074, "lon": -0.1278 } } },
+				{ "range": { "bedrooms": { "gte": 3 } } },
+				{ "terms": { "main_fuel": ["mains_gas", "electricity"] } },
+				{ "term": { "solar_panels": true } },
+				{ "range": { "running_cost_monthly": { "lte": 200 } } }
+			]
+		}
+	},
+	"sort": [ { "price": "asc" }, { "listed_at": "desc" } ]
+}
+```
+
+Collapse multiple active listings for the same property (show one row per property):
+
+```json
+POST listings-active/_search
+{
+	"size": 20,
+	"query": { "match_all": {} },
+	"collapse": {
+		"field": "property_id",
+		"inner_hits": { "name": "all_listings_for_property", "size": 5, "sort": [ { "price": "asc" } ] }
+	},
+	"sort": [ { "price": "asc" } ]
+}
+```
+
+Retention & scale:
+- Keep expired listings in the same index with `is_active=false`; search via `listings-active` alias.
+- Purge expired records older than ~90 days using delete-by-query on `expires_at`.
+- Start with 1–3 primary shards; if volume grows, create `listings-v2` with more shards and reindex, then move the aliases.
+
+Analytics:
+- Common aggregations (counts by EPC band, main fuel, solar flags; avg price by EPC band; cost distributions) work directly on the listings index because EPC attributes are denormalized onto listings.
+- For property-only analytics, use the `properties` index. If you ever need complex cross-entity aggregations that can’t be denormalized, consider transforms or parent-child in a dedicated analytics index.

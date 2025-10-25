@@ -1,0 +1,52 @@
+{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 1,
+    "index": {
+      "sort.field": ["property_id", "listed_at"],
+      "sort.order": ["asc", "desc"]
+    },
+    "analysis": {
+      "normalizer": {
+        "lowercase": {
+          "type": "custom",
+          "filter": ["lowercase"]
+        }
+      }
+    }
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "listing_id": { "type": "keyword" },
+      "property_id": { "type": "keyword" },
+      "source": { "type": "keyword" },
+      "external_id": { "type": "keyword" },
+      "status": { "type": "keyword", "normalizer": "lowercase" },
+      "is_active": { "type": "boolean" },
+      "listed_at": { "type": "date" },
+      "expires_at": { "type": "date" },
+
+      "price": { "type": "long" },
+      "currency": { "type": "keyword" },
+      "bedrooms": { "type": "short" },
+      "bathrooms": { "type": "short" },
+      "tenure": { "type": "keyword" },
+
+      "url": { "type": "keyword", "doc_values": false },
+      "media_urls": { "type": "keyword" },
+
+      "address_line": { "type": "text", "fields": { "keyword": { "type": "keyword", "ignore_above": 256 } } },
+      "postcode": { "type": "keyword" },
+      "location": { "type": "geo_point" },
+
+      "main_fuel": { "type": "keyword" },
+      "solar_panels": { "type": "boolean" },
+      "solar_water_heating": { "type": "boolean" },
+      "epc_rating": { "type": "keyword" },
+      "epc_score": { "type": "short" },
+      "running_cost_annual": { "type": "float" },
+      "running_cost_monthly": { "type": "float" }
+    }
+  }
+}

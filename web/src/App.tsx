@@ -1,14 +1,14 @@
 import './App.css'
 import { useState } from 'react'
 import LocationSearch from './components/LocationSearch'
-import SearchResults from './components/SearchResults'
+import ListingsResults from './components/ListingsResults';
 
 function App() {
-  const [query, setQuery] = useState<{location: string | null, energyRating?: string}>({location: null});
+  const [query, setQuery] = useState<{q: string | null, energyRating?: string}>({q: null});
   const [searchTrigger, setSearchTrigger] = useState<number>(0)
 
   const handleSearch = ({location, energyRating}: {location: string | null, energyRating?: string}) => {
-    setQuery({location, energyRating})
+    setQuery({q: location, energyRating})
     setSearchTrigger(Date.now()) // Force a new search even if location is the same
   }
 
@@ -19,7 +19,9 @@ function App() {
 
 
       <div style={{ marginTop: 20 }}>
-        <SearchResults query={query} searchTrigger={searchTrigger} />
+        <ListingsResults query={query} searchTrigger={searchTrigger} pageSize={20} />
+
+
       </div>
     </div>
   )

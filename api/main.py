@@ -6,6 +6,8 @@ import math
 import os
 import httpx
 from opensearchpy import OpenSearch
+import logging
+
 # optionally load a local .env file for development; secrets should not be committed
 from dotenv import load_dotenv
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'), override=False)
@@ -16,17 +18,18 @@ from running_cost import calculate_running_cost
 
 # We return upstream EPC data as-is; do not rename or map fields.
 
-
-import logging
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+)
 logger = logging.getLogger("green-home-search.api")
 
 # OpenSearch configuration
-OPENSEARCH_URL = os.environ.get('OPENSEARCH_URL', 'http://localhost:9200')
-OPENSEARCH_USER = os.environ.get('OPENSEARCH_USER', 'admin')
-OPENSEARCH_PASS = os.environ.get('OPENSEARCH_PASS', 'admin')
-CERTIFICATES_INDEX = os.environ.get('CERTIFICATES_INDEX', 'certificates')
+OPENSEARCH_URL = os.environ.get("OPENSEARCH_URL", "http://localhost:9200")
+OPENSEARCH_USER = os.environ.get("OPENSEARCH_USER", "admin")
+OPENSEARCH_PASS = os.environ.get("OPENSEARCH_PASS", "admin")
+CERTIFICATES_INDEX = os.environ.get("CERTIFICATES_INDEX", "certificates")
+PROPERTIES_INDEX = os.environ.get("PROPERTIES_INDEX", "properties")
+LISTINGS_SEARCH_ALIAS = os.environ.get("LISTINGS_SEARCH_ALIAS", "listings-active")
 
 # Initialize OpenSearch client
 opensearch_client = OpenSearch(
@@ -332,3 +335,153 @@ def format_address(source: Dict[str, Any]) -> str:
     
     return address
 
+
+# ---------------------------
+# Listings search endpoints
+# ---------------------------
+
+
+def build_listings_query(
+    q: Optional[str],
+    lat: Optional[float],
+    lon: Optional[float],
+    radius_km: Optional[float],
+    bedrooms_min: Optional[int],
+    main_fuel: Optional[List[str]],
+    solar_panels: Optional[bool],
+    solar_water_heating: Optional[bool],
+    running_cost_monthly_max: Optional[float],
+) -> Dict[str, Any]:
+    filters: List[Dict[str, Any]] = [{"term": {"is_active": True}}]
+
+    # Location filter
+    if lat is not None and lon is not None and radius_km is not None:
+        filters.append(
+            {
+                "geo_distance": {
+                    "distance": f"{radius_km}km",
+                    "location": {"lat": lat, "lon": lon},
+                }
+            }
+        )
+
+    # Bedrooms
+    if bedrooms_min is not None:
+        filters.append({"range": {"bedrooms": {"gte": bedrooms_min}}})
+
+    # Main fuel filter
+    if main_fuel:
+        filters.append({"terms": {"main_fuel": main_fuel}})
+
+    # Solar flags
+    if solar_panels is not None:
+        filters.append({"term": {"solar_panels": bool(solar_panels)}})
+    if solar_water_heating is not None:
+        filters.append({"term": {"solar_water_heating": bool(solar_water_heating)}})
+
+    # Running cost cap
+    if running_cost_monthly_max is not None:
+        filters.append(
+            {"range": {"running_cost_monthly": {"lte": running_cost_monthly_max}}}
+        )
+
+    # Text query (postcode/address)
+    must: List[Dict[str, Any]] = []
+    if q:
+        must.append(
+            {
+                "bool": {
+                    "should": [
+                        {"term": {"postcode": {"value": q.upper(), "boost": 5}}},
+                        {"match": {"address_line": {"query": q, "boost": 2}}},
+                    ],
+                    "minimum_should_match": 1,
+                }
+            }
+        )
+
+    query: Dict[str, Any] = {"bool": {}}
+    if must:
+        query["bool"]["must"] = must
+    if filters:
+        query["bool"]["filter"] = filters
+
+    return query
+
+
+@app.get("/listings/search", summary="Search property listings")
+async def search_listings(
+    request: Request,
+    response: Response,
+    q: Optional[str] = Query(None, description="Address or postcode"),
+    lat: Optional[float] = Query(None, description="Latitude for geo search"),
+    lon: Optional[float] = Query(None, description="Longitude for geo search"),
+    radius_km: Optional[float] = Query(
+        10.0, description="Search radius in km when using geo search", ge=0.1, le=200.0
+    ),
+    bedrooms_min: Optional[int] = Query(None, ge=0),
+    main_fuel: Optional[List[str]] = Query(
+        None, description="Filter by main fuel types"
+    ),
+    solar_panels: Optional[bool] = Query(None),
+    solar_water_heating: Optional[bool] = Query(None),
+    running_cost_monthly_max: Optional[float] = Query(None, ge=0.0),
+    collapse_per_property: bool = Query(
+        True, description="Collapse multiple listings per property_id"
+    ),
+    size: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+):
+    """Search active listings by address/postcode or by lat/lon within a radius,
+    and filter by bedrooms, main fuel, solar flags, and max monthly running cost.
+    """
+    try:
+        query = build_listings_query(
+            q=q,
+            lat=lat,
+            lon=lon,
+            radius_km=radius_km,
+            bedrooms_min=bedrooms_min,
+            main_fuel=main_fuel,
+            solar_panels=solar_panels,
+            solar_water_heating=solar_water_heating,
+            running_cost_monthly_max=running_cost_monthly_max,
+        )
+
+        body: Dict[str, Any] = {
+            "query": query,
+            "from": offset,
+            "size": size,
+            "sort": [{"price": "asc"}, {"listed_at": "desc"}],
+            "track_total_hits": True,
+        }
+
+        if collapse_per_property:
+            body["collapse"] = {
+                "field": "property_id",
+                "inner_hits": {
+                    "name": "all_listings_for_property",
+                    "size": 5,
+                    "sort": [{"price": "asc"}],
+                },
+            }
+
+        result = opensearch_client.search(
+            index=LISTINGS_SEARCH_ALIAS, body=body, request_timeout=30
+        )
+
+        # Return raw listing docs for now; UI can shape them as needed
+        hits = result.get("hits", {}).get("hits", [])
+        listings = [{"id": h.get("_id"), **(h.get("_source") or {})} for h in hits]
+
+        return {
+            "total": result.get("hits", {}).get("total", {}).get("value", 0),
+            "took": result.get("took"),
+            "offset": offset,
+            "limit": size,
+            "index_used": LISTINGS_SEARCH_ALIAS,
+            "results": listings,
+        }
+    except Exception as e:
+        logger.error("Listings search error: %s", str(e))
+        raise HTTPException(status_code=500, detail=f"Listings search failed: {str(e)}")
