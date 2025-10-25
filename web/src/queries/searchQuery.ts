@@ -69,9 +69,16 @@ export const fetchSearch = async ({query: q, pageIndex = 0, pageSize = 10}: {que
 
 	const text = await res.text().catch(() => '');
 
+<<<<<<< HEAD
 	let payload: Response | null = null;
 	try {
 		payload = text ? (JSON.parse(text) as Response) : null;
+=======
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	let payload: any = null;
+	try {
+		payload = text ? JSON.parse(text) : null;
+>>>>>>> 80ded74 (Fix linter issues in searchQuery.ts)
 	} catch {
 		throw new Error(`Invalid JSON response`);
 	}
