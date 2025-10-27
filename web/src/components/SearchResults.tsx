@@ -45,7 +45,7 @@ const SearchResults: React.FC<{ query: { location: string | null; energyRating?:
 							<tr key={res.uprn}>
 								<td>{res.address}</td>
 								<td>{res["current_energy_rating"] ?? "unknown"}</td>
-								<td>{res["running_cost"] ?? "unknown"}</td>
+								<td>{String(res["running_cost"] ?? "unknown")}</td>
 							</tr>
 						))}
 					</tbody>
