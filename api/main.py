@@ -427,8 +427,8 @@ def build_listings_sort_clause(sort_by: Optional[str] = None) -> List[Dict[str, 
                     "script": {
                         "lang": "painless",
                         "source": """
-                            String rating = doc['epc_rating.keyword'].size() > 0 ? 
-                                doc['epc_rating.keyword'].value : 'Z';
+                            String rating = doc['epc_rating'].size() > 0 ? 
+                                doc['epc_rating'].value : 'Z';
                             Map ratings = ['A':1, 'B':2, 'C':3, 'D':4, 'E':5, 'F':6, 'G':7];
                             return ratings.getOrDefault(rating, 999);
                         """
