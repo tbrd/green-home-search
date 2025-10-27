@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { fetchActiveListings, type ListingsResponse, type ListingsQuery } from '../queries/listingsQuery';
+import { Button } from './ui/button';
 
 type Props = {
   query: ListingsQuery;
@@ -102,12 +103,12 @@ const ListingsResults: React.FC<Props> = ({ query, searchTrigger, pageSize = 20 
           <div style={{ marginTop: 8 }}>
             Current page: {pageIndex + 1} of {Math.ceil((total ?? 0) / (limit ?? pageSize))}
           </div>
-          <button onClick={() => setPageIndex((p) => Math.max(0, p - 1))} disabled={pageIndex === 0}>
+          <Button onClick={() => setPageIndex((p) => Math.max(0, p - 1))} disabled={pageIndex === 0} variant="outline">
             Previous
-          </button>
-          <button onClick={() => setPageIndex((p) => p + 1)} disabled={!nextPageExists}>
+          </Button>
+          <Button onClick={() => setPageIndex((p) => p + 1)} disabled={!nextPageExists} variant="outline">
             Next
-          </button>
+          </Button>
         </>
       ) : (
         // Only show an empty-state once the query has successfully run

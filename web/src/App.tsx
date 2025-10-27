@@ -14,14 +14,22 @@ function App() {
   }
 
   return (
-    <div style={{ padding: 20 }}>
-      <h1>Green Home Search</h1>
-      
-      <h2>Search Property Listings</h2>
-      <ListingsSearch onSearch={handleListingsSearch} />
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Green Home Search</h1>
+          <p className="text-gray-600">Find energy-efficient homes in the UK</p>
+        </div>
 
-      <div style={{ marginTop: 20 }}>
-        <ListingsResults query={listingsQuery} searchTrigger={searchTrigger} pageSize={20} />
+        
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <ListingsSearch onSearch={handleListingsSearch} />
+        </div>
+
+        <div>
+          <ListingsResults query={listingsQuery} searchTrigger={searchTrigger} pageSize={20} />
+        </div>
+
       </div>
     </div>
   )
