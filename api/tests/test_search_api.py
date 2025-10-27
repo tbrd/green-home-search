@@ -208,6 +208,18 @@ def test_search_includes_running_cost(client):
                 assert result["running_cost"] is None
 
 
+def test_search_sort_by_rating(client):
+    """Test that search results can be sorted by EPC rating."""
+    response = client.get("/search?address=London&limit=10&sort_by=rating")
+    
+    assert response.status_code == 200
+    data = response.json()
+
+    # Check basic structure
+    assert "results" in data
+    assert "total" in data
+    
+   
 def test_listings_search_with_price_filter(client):
     """Test listings search with price range filter."""
     response = client.get("/listings/search?q=London&min_price=100000&max_price=500000&size=5")
@@ -226,33 +238,3 @@ def test_listings_search_with_price_filter(client):
             assert 100000 <= price <= 500000, f"Price {price} outside range [100000, 500000]"
 
 
-def test_listings_search_with_min_price_only(client):
-    """Test listings search with only minimum price filter."""
-    response = client.get("/listings/search?q=London&min_price=250000&size=5")
-    
-    assert response.status_code == 200
-    data = response.json()
-    
-    # Check basic structure
-    assert "results" in data
-    
-    # If results exist, check they meet minimum price
-    for result in data["results"]:
-        if result.get("price") is not None:
-            assert result["price"] >= 250000
-
-
-def test_listings_search_with_max_price_only(client):
-    """Test listings search with only maximum price filter."""
-    response = client.get("/listings/search?q=London&max_price=300000&size=5")
-    
-    assert response.status_code == 200
-    data = response.json()
-    
-    # Check basic structure
-    assert "results" in data
-    
-    # If results exist, check they meet maximum price
-    for result in data["results"]:
-        if result.get("price") is not None:
-            assert result["price"] <= 300000

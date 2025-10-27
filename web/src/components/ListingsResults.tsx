@@ -10,28 +10,33 @@ type Props = {
 
 const ListingsResults: React.FC<Props> = ({ query, searchTrigger, pageSize = 20 }) => {
   const [pageIndex, setPageIndex] = useState(0);
+  const [sortBy, setSortBy] = useState('price');
 
   // Reset pagination when new search is triggered
   useEffect(() => {
     setPageIndex(0);
   }, [searchTrigger]);
 
-  const { isLoading, error, data } = useQuery<ListingsResponse, Error>({
-    queryKey: ['listings', query, pageIndex, searchTrigger],
-    queryFn: () => fetchActiveListings({ query, pageIndex, pageSize }),
-    enabled: !!query,
+
+  const hasText = !!query?.q && String(query.q).trim().length > 0;
+  const hasGeo = query?.lat != null && query?.lon != null;
+
+  const { isPending, isError, error, data, isFetching } = useQuery<ListingsResponse, Error>({
+    queryKey: ['listings', query, pageIndex, sortBy, searchTrigger],
+    queryFn: () => fetchActiveListings({ query: {...query, sortBy}, pageIndex, pageSize }),
+    enabled: hasText || hasGeo,
     placeholderData: keepPreviousData,
   });
 
+
   // A minimal guard: show prompt when neither q nor lat/lon provided
-  const hasText = !!query?.q && String(query.q).trim().length > 0;
-  const hasGeo = query?.lat != null && query?.lon != null;
   if (!hasText && !hasGeo) {
     return <div>Enter a postcode or provide a map location to search listings.</div>;
   }
 
-  if (isLoading) return <div>Searching listings...</div>;
-  if (error) return <div>Error: {error.message}</div>;
+  // Show loading state only when we don't yet have any data
+  if (isPending || (isFetching && !data)) return <div>Searching listings...</div>;
+  if (isError) return <div>Error: {error.message}</div>;
 
   const { results, total, took, offset, limit } = data ?? { results: [] };
   const nextPageExists = (offset ?? 0) + (limit ?? 0) < (total ?? 0);
@@ -40,6 +45,22 @@ const ListingsResults: React.FC<Props> = ({ query, searchTrigger, pageSize = 20 
     <div>
       {results.length > 0 ? (
         <>
+          <div style={{ marginBottom: '16px' }}>
+            <label htmlFor="listings-sort-select">Sort by: </label>
+            <select 
+              id="listings-sort-select"
+              value={sortBy} 
+              onChange={(e) => {
+                setSortBy(e.target.value);
+                setPageIndex(0); // Reset to first page on sort change
+              }}
+              style={{ padding: '4px 8px' }}
+            >
+              <option value="price">Price (Low to High)</option>
+              <option value="rating">EPC Rating (A to G)</option>
+              <option value="running_cost">Running Cost (Low to High)</option>
+            </select>
+          </div>
           <table>
             <thead>
               <tr>
@@ -89,6 +110,7 @@ const ListingsResults: React.FC<Props> = ({ query, searchTrigger, pageSize = 20 
           </button>
         </>
       ) : (
+        // Only show an empty-state once the query has successfully run
         <div>No listings found</div>
       )}
     </div>
