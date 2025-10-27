@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { ListingsQuery } from '../queries/listingsQuery';
+import { Button } from './ui/button';
 
 interface ListingsSearchProps {
     onSearch: (query: ListingsQuery) => void;
@@ -53,9 +54,9 @@ const ListingsSearch: React.FC<ListingsSearchProps> = ({ onSearch }) => {
                 min="0"
                 step="1000"
             />
-            <button type="submit" style={{ padding: '8px 16px' }}>
+            <Button type="submit">
                 Search Listings
-            </button>
+            </Button>
         </form>
     );
 };
