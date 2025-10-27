@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Button } from './ui/button';
 
 interface SearchProps {
     onSearch: (query: {location: string; energyRating?: string}) => void;
@@ -35,9 +36,9 @@ const LocationSearch: React.FC<SearchProps> = ({ onSearch }) => {
                 <option value="F">F</option>
                 <option value="G">G</option>
             </select>
-            <button type="submit" style={{ padding: '8px 16px' }}>
+            <Button type="submit">
                 Search
-            </button>
+            </Button>
         </form>
     );
 };
