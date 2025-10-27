@@ -1,27 +1,27 @@
 import './App.css'
 import { useState } from 'react'
-import LocationSearch from './components/LocationSearch'
+import ListingsSearch from './components/ListingsSearch'
 import ListingsResults from './components/ListingsResults';
+import type { ListingsQuery } from './queries/listingsQuery';
 
 function App() {
-  const [query, setQuery] = useState<{q: string | null, energyRating?: string}>({q: null});
+  const [listingsQuery, setListingsQuery] = useState<ListingsQuery>({q: null});
   const [searchTrigger, setSearchTrigger] = useState<number>(0)
 
-  const handleSearch = ({location, energyRating}: {location: string | null, energyRating?: string}) => {
-    setQuery({q: location, energyRating})
-    setSearchTrigger(Date.now()) // Force a new search even if location is the same
+  const handleListingsSearch = (query: ListingsQuery) => {
+    setListingsQuery(query)
+    setSearchTrigger(Date.now()) // Force a new search
   }
 
   return (
     <div style={{ padding: 20 }}>
       <h1>Green Home Search</h1>
-      <LocationSearch onSearch={handleSearch} />
-
+      
+      <h2>Search Property Listings</h2>
+      <ListingsSearch onSearch={handleListingsSearch} />
 
       <div style={{ marginTop: 20 }}>
-        <ListingsResults query={query} searchTrigger={searchTrigger} pageSize={20} />
-
-
+        <ListingsResults query={listingsQuery} searchTrigger={searchTrigger} pageSize={20} />
       </div>
     </div>
   )

@@ -464,6 +464,8 @@ def build_listings_query(
     solar_panels: Optional[bool],
     solar_water_heating: Optional[bool],
     running_cost_monthly_max: Optional[float],
+    min_price: Optional[float],
+    max_price: Optional[float],
 ) -> Dict[str, Any]:
     filters: List[Dict[str, Any]] = [{"term": {"is_active": True}}]
 
@@ -497,6 +499,15 @@ def build_listings_query(
         filters.append(
             {"range": {"running_cost_monthly": {"lte": running_cost_monthly_max}}}
         )
+
+    # Price range filter
+    if min_price is not None or max_price is not None:
+        price_range: Dict[str, Any] = {}
+        if min_price is not None:
+            price_range["gte"] = min_price
+        if max_price is not None:
+            price_range["lte"] = max_price
+        filters.append({"range": {"price": price_range}})
 
     # Text query (postcode/address)
     must: List[Dict[str, Any]] = []
@@ -539,6 +550,8 @@ async def search_listings(
     solar_panels: Optional[bool] = Query(None),
     solar_water_heating: Optional[bool] = Query(None),
     running_cost_monthly_max: Optional[float] = Query(None, ge=0.0),
+    min_price: Optional[float] = Query(None, description="Minimum price", ge=0.0),
+    max_price: Optional[float] = Query(None, description="Maximum price", ge=0.0),
     collapse_per_property: bool = Query(
         True, description="Collapse multiple listings per property_id"
     ),
@@ -561,6 +574,8 @@ async def search_listings(
             solar_panels=solar_panels,
             solar_water_heating=solar_water_heating,
             running_cost_monthly_max=running_cost_monthly_max,
+            min_price=min_price,
+            max_price=max_price,
         )
 
         # Build sort clause based on sort_by parameter
