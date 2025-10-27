@@ -206,3 +206,61 @@ def test_search_includes_running_cost(client):
             else:
                 # If cost data is missing, running_cost should be None
                 assert result["running_cost"] is None
+
+
+def test_search_sort_by_rating(client):
+    """Test that search results can be sorted by EPC rating."""
+    response = client.get("/search?address=London&limit=10&sort_by=rating")
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Check that results are present
+    if data["total"] > 0 and len(data["results"]) > 1:
+        # Check that ratings are in order (A < B < C, etc.)
+        rating_order = {"A": 1, "B": 2, "C": 3, "D": 4, "E": 5, "F": 6, "G": 7}
+        prev_rating_value = 0
+        for result in data["results"]:
+            rating = result.get("current_energy_rating")
+            if rating and rating in rating_order:
+                current_rating_value = rating_order[rating]
+                # Current rating should be >= previous rating (A is best, sorted ascending)
+                assert current_rating_value >= prev_rating_value or prev_rating_value == 0
+                prev_rating_value = current_rating_value
+
+
+def test_search_sort_by_running_cost(client):
+    """Test that search results can be sorted by running cost."""
+    response = client.get("/search?address=Manchester&limit=10&sort_by=running_cost")
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Check that results are present and have running costs
+    if data["total"] > 0 and len(data["results"]) > 1:
+        prev_cost = 0
+        for result in data["results"]:
+            cost = result.get("running_cost")
+            if cost is not None:
+                # Running costs should be in ascending order (low to high)
+                assert cost >= prev_cost or prev_cost == 0
+                prev_cost = cost
+
+
+def test_search_sort_by_relevance(client):
+    """Test that search results default to relevance sorting."""
+    # Test without sort_by parameter (should default to relevance)
+    response = client.get("/search?address=Birmingham&limit=5")
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Just verify the request succeeds - relevance sorting is default
+    assert "results" in data
+    
+    # Test with explicit relevance sort
+    response2 = client.get("/search?address=Birmingham&limit=5&sort_by=relevance")
+    assert response2.status_code == 200
+    data2 = response2.json()
+    assert "results" in data2
+

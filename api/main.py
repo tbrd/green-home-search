@@ -121,6 +121,7 @@ async def search(
     property_type: Optional[str] = Query(None, description="Filter by property type (House, Flat, etc.)"),
     min_efficiency: Optional[int] = Query(None, description="Minimum energy efficiency score", ge=0, le=100),
     max_efficiency: Optional[int] = Query(None, description="Maximum energy efficiency score", ge=0, le=100),
+    sort_by: Optional[str] = Query(None, description="Sort results by: relevance (default), rating, running_cost"),
 ):
     """
     Parameters:
@@ -131,6 +132,7 @@ async def search(
     - property_type: optional filter by property type
     - min_efficiency: minimum energy efficiency score
     - max_efficiency: maximum energy efficiency score
+    - sort_by: sort results by 'relevance' (default), 'rating', or 'running_cost'
 
     Returns a list of properties from the opensearch-epc db matching the address query.
     """
@@ -147,15 +149,15 @@ async def search(
             address, energy_rating, property_type, min_efficiency, max_efficiency
         )
         
+        # Build sort clause based on sort_by parameter
+        sort_clause = build_sort_clause(sort_by)
+        
         # Execute the search with optimizations
         search_body = {
             "query": query,
             "from": offset,
             "size": limit,
-            "sort": [
-                {"_score": {"order": "desc"}},
-                {"LODGEMENT_DATETIME": {"order": "desc", "missing": "_last"}}
-            ],
+            "sort": sort_clause,
             "_source": get_source_fields(),
             "track_total_hits": True,
             "timeout": "10s"  # Add timeout to prevent long-running queries
@@ -210,6 +212,70 @@ async def search(
     except Exception as e:
         logger.error("Search error: %s", str(e))
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+
+
+
+def build_sort_clause(sort_by: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Build OpenSearch sort clause based on sort_by parameter.
+    
+    Args:
+        sort_by: Sort option - 'relevance', 'rating', or 'running_cost'
+        
+    Returns:
+        List of sort clauses for OpenSearch
+    """
+    # Define energy rating order (A is best, G is worst)
+    rating_order = {"A": 1, "B": 2, "C": 3, "D": 4, "E": 5, "F": 6, "G": 7}
+    
+    if sort_by == "rating":
+        # Sort by energy rating (A to G), then by score
+        # Use a script to map ratings to numeric values for proper sorting
+        return [
+            {
+                "_script": {
+                    "type": "number",
+                    "script": {
+                        "lang": "painless",
+                        "source": """
+                            String rating = doc['CURRENT_ENERGY_RATING.keyword'].size() > 0 ? 
+                                doc['CURRENT_ENERGY_RATING.keyword'].value : 'Z';
+                            Map ratings = ['A':1, 'B':2, 'C':3, 'D':4, 'E':5, 'F':6, 'G':7];
+                            return ratings.getOrDefault(rating, 999);
+                        """
+                    },
+                    "order": "asc"
+                }
+            },
+            {"_score": {"order": "desc"}}
+        ]
+    elif sort_by == "running_cost":
+        # Sort by running cost (low to high), then by score
+        # We need to calculate running cost in the script since it's computed
+        return [
+            {
+                "_script": {
+                    "type": "number",
+                    "script": {
+                        "lang": "painless",
+                        "source": """
+                            if (doc['HEATING_COST_CURRENT'].size() > 0 && doc['HOT_WATER_COST_CURRENT'].size() > 0) {
+                                return doc['HEATING_COST_CURRENT'].value + doc['HOT_WATER_COST_CURRENT'].value;
+                            }
+                            return 999999;
+                        """
+                    },
+                    "order": "asc"
+                }
+            },
+            {"_score": {"order": "desc"}}
+        ]
+    else:
+        # Default: sort by relevance (score) then by lodgement date
+        return [
+            {"_score": {"order": "desc"}},
+            {"LODGEMENT_DATETIME": {"order": "desc", "missing": "_last"}}
+        ]
 
 
 def build_optimized_search_query(
@@ -341,6 +407,53 @@ def format_address(source: Dict[str, Any]) -> str:
 # ---------------------------
 
 
+
+
+def build_listings_sort_clause(sort_by: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Build OpenSearch sort clause for listings based on sort_by parameter.
+    
+    Args:
+        sort_by: Sort option - 'price' (default), 'rating', or 'running_cost'
+        
+    Returns:
+        List of sort clauses for OpenSearch
+    """
+    if sort_by == "rating":
+        # Sort by EPC rating (A to G), then by price
+        return [
+            {
+                "_script": {
+                    "type": "number",
+                    "script": {
+                        "lang": "painless",
+                        "source": """
+                            String rating = doc['epc_rating'].size() > 0 ? 
+                                doc['epc_rating'].value : 'Z';
+                            Map ratings = ['A':1, 'B':2, 'C':3, 'D':4, 'E':5, 'F':6, 'G':7];
+                            return ratings.getOrDefault(rating, 999);
+                        """
+                    },
+                    "order": "asc"
+                }
+            },
+            {"price": {"order": "asc", "missing": "_last"}},
+            {"listed_at": {"order": "desc"}}
+        ]
+    elif sort_by == "running_cost":
+        # Sort by running cost (low to high), then by price
+        return [
+            {"running_cost_monthly": {"order": "asc", "missing": "_last"}},
+            {"price": {"order": "asc", "missing": "_last"}},
+            {"listed_at": {"order": "desc"}}
+        ]
+    else:
+        # Default: sort by price then by listing date
+        return [
+            {"price": {"order": "asc", "missing": "_last"}},
+            {"listed_at": {"order": "desc"}}
+        ]
+
+
 def build_listings_query(
     q: Optional[str],
     lat: Optional[float],
@@ -431,9 +544,11 @@ async def search_listings(
     ),
     size: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    sort_by: Optional[str] = Query(None, description="Sort results by: price (default), rating, running_cost"),
 ):
     """Search active listings by address/postcode or by lat/lon within a radius,
     and filter by bedrooms, main fuel, solar flags, and max monthly running cost.
+    Results can be sorted by price (default), rating, or running_cost.
     """
     try:
         query = build_listings_query(
@@ -448,11 +563,14 @@ async def search_listings(
             running_cost_monthly_max=running_cost_monthly_max,
         )
 
+        # Build sort clause based on sort_by parameter
+        sort_clause = build_listings_sort_clause(sort_by)
+
         body: Dict[str, Any] = {
             "query": query,
             "from": offset,
             "size": size,
-            "sort": [{"price": "asc"}, {"listed_at": "desc"}],
+            "sort": sort_clause,
             "track_total_hits": True,
         }
 

@@ -63,6 +63,9 @@ export type ListingsQuery = {
   solarWaterHeating?: boolean | null;
   runningCostMonthlyMax?: number | null;
 
+  // sorting
+  sortBy?: string | null;
+
   // behavior
   collapsePerProperty?: boolean | null; // defaults true on API
 }
@@ -90,6 +93,9 @@ export const fetchActiveListings = async ({ query, pageIndex = 0, pageSize = 20 
   if (query.solarPanels != null) searchParams.set('solar_panels', String(query.solarPanels));
   if (query.solarWaterHeating != null) searchParams.set('solar_water_heating', String(query.solarWaterHeating));
   if (query.runningCostMonthlyMax != null) searchParams.set('running_cost_monthly_max', String(query.runningCostMonthlyMax));
+
+  // sorting
+  if (query.sortBy) searchParams.set('sort_by', query.sortBy);
 
   // behavior
   if (query.collapsePerProperty != null) searchParams.set('collapse_per_property', String(query.collapsePerProperty));
