@@ -5,7 +5,7 @@ interface SearchProps {
     onSearch: (query: {location: string; energyRating?: string}) => void;
 }
 
-const LocationSearch: React.FC<SearchProps> = ({ onSearch }) => {
+const EpcSearch: React.FC<SearchProps> = ({ onSearch }) => {
     const [location, setLocation] = useState('');
     const [energyRating, setEnergyRating] = useState('');
 
@@ -43,4 +43,4 @@ const LocationSearch: React.FC<SearchProps> = ({ onSearch }) => {
     );
 };
 
-export default LocationSearch;
+export default EpcSearch;

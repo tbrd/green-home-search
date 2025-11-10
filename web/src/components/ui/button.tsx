@@ -6,20 +6,20 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-950 disabled:pointer-events-none disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-950 disabled:pointer-events-none disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
         default:
-          "bg-brand-600 text-white shadow hover:bg-brand-700 hover:shadow-lg",
+          "bg-primary-600 text-white shadow hover:bg-primary-700 hover:shadow-lg",
         destructive:
           "bg-red-500 text-white shadow-sm hover:bg-red-600 hover:shadow-lg",
         outline:
-          "border border-brand-600 bg-white shadow-sm hover:bg-brand-50 hover:text-brand-700 hover:shadow-md hover:border-brand-700",
+          "border border-primary-600 bg-white shadow-sm hover:bg-primary-50 hover:text-primary-700 hover:shadow-md hover:border-primary-700",
         secondary:
-          "bg-brand-100 text-brand-900 shadow-sm hover:bg-brand-200 hover:shadow-md",
-        ghost: "hover:bg-brand-100 hover:text-brand-900",
-        link: "text-brand-600 underline-offset-4 hover:underline",
+          "bg-primary-100 text-primary-900 shadow-sm hover:bg-primary-200 hover:shadow-md",
+        ghost: "hover:bg-primary-100 hover:text-primary-900",
+        link: "text-primary-600 underline-offset-4 hover:underline",
       },
       size: {
         default: "h-9 px-4 py-2",
