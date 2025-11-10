@@ -1,36 +1,23 @@
 import './App.css'
-import { useState } from 'react'
-import ListingsSearch from './components/ListingsSearch'
-import ListingsResults from './components/ListingsResults';
-import type { ListingsQuery } from './queries/listingsQuery';
-import Header from './Header';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import Header from './Header'
+import Home from './pages/Home'
+import Profile from './pages/Profile'
 
 function App() {
-  const [listingsQuery, setListingsQuery] = useState<ListingsQuery>({q: null});
-  const [searchTrigger, setSearchTrigger] = useState<number>(0)
-
-  const handleListingsSearch = (query: ListingsQuery) => {
-    setListingsQuery(query)
-    setSearchTrigger(Date.now()) // Force a new search
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto">
-
-        <Header />
-        
-        
-        <div className="bg-white rounded-lg shadow-sm p-2 mb-6">
-          <ListingsSearch onSearch={handleListingsSearch} />
+    <Router>
+      <div className="min-h-screen bg-gray-50">
+        <div className="container mx-auto">
+          <Header />
+          
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/profile" element={<Profile />} />
+          </Routes>
         </div>
-
-        <div>
-          <ListingsResults query={listingsQuery} searchTrigger={searchTrigger} pageSize={20} />
-        </div>
-
       </div>
-    </div>
+    </Router>
   )
 }
 
