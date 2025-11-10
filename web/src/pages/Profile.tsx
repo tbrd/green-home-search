@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { z } from 'zod';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { Button } from '../components/ui/button';
 
@@ -32,12 +33,36 @@ const initialProfileData: ProfileData = {
   buyingStatus: null,
 };
 
+// Zod validation schema
+const profileSchema = z.object({
+  mortgage: z.object({
+    amount: z.number().positive().optional().nullable(),
+    interestRate: z.number().positive().max(100).optional().nullable(),
+    termYears: z.number().int().positive().max(50).optional().nullable(),
+  }),
+  currentExpenditure: z.object({
+    heating: z.number().nonnegative().optional().nullable(),
+    hotWater: z.number().nonnegative().optional().nullable(),
+    rentOrMortgage: z.number().nonnegative().optional().nullable(),
+    houseMaintenance: z.number().nonnegative().optional().nullable(),
+  }),
+  buyingStatus: z.enum(['first-home', 'moving', 'second-home']).nullable(),
+});
+
+interface FormErrors {
+  [key: string]: string | undefined;
+}
+
 const Profile: React.FC = () => {
   const [profileData, setProfileData] = useLocalStorage<ProfileData>('profile', initialProfileData);
   const [formData, setFormData] = useState<ProfileData>(profileData);
   const [saved, setSaved] = useState(false);
+  const [errors, setErrors] = useState<FormErrors>({});
 
   const handleMortgageChange = (field: keyof ProfileData['mortgage'], value: string) => {
+    // Clear error for this field
+    setErrors((prev) => ({ ...prev, [`mortgage.${field}`]: undefined }));
+    
     const numValue = value === '' ? null : parseFloat(value);
     setFormData({
       ...formData,
@@ -49,6 +74,9 @@ const Profile: React.FC = () => {
   };
 
   const handleExpenditureChange = (field: keyof ProfileData['currentExpenditure'], value: string) => {
+    // Clear error for this field
+    setErrors((prev) => ({ ...prev, [`currentExpenditure.${field}`]: undefined }));
+    
     const numValue = value === '' ? null : parseFloat(value);
     setFormData({
       ...formData,
@@ -68,6 +96,21 @@ const Profile: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate with Zod
+    const result = profileSchema.safeParse(formData);
+    
+    if (!result.success) {
+      const newErrors: FormErrors = {};
+      result.error.issues.forEach((issue) => {
+        const path = issue.path.join('.');
+        newErrors[path] = issue.message;
+      });
+      setErrors(newErrors);
+      return;
+    }
+    
+    setErrors({});
     setProfileData(formData);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
@@ -90,14 +133,16 @@ const Profile: React.FC = () => {
               </label>
               <input
                 id="mortgage-amount"
-                type="number"
+                type="text"
+                inputMode="decimal"
                 placeholder="e.g., 250000"
                 value={formData.mortgage.amount ?? ''}
                 onChange={(e) => handleMortgageChange('amount', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                min="0"
-                step="1000"
               />
+              {errors['mortgage.amount'] && (
+                <p className="text-red-600 text-sm mt-1">{errors['mortgage.amount']}</p>
+              )}
             </div>
             
             <div>
@@ -106,14 +151,16 @@ const Profile: React.FC = () => {
               </label>
               <input
                 id="interest-rate"
-                type="number"
+                type="text"
+                inputMode="decimal"
                 placeholder="e.g., 4.5"
                 value={formData.mortgage.interestRate ?? ''}
                 onChange={(e) => handleMortgageChange('interestRate', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                min="0"
-                step="0.1"
               />
+              {errors['mortgage.interestRate'] && (
+                <p className="text-red-600 text-sm mt-1">{errors['mortgage.interestRate']}</p>
+              )}
             </div>
             
             <div>
@@ -122,14 +169,16 @@ const Profile: React.FC = () => {
               </label>
               <input
                 id="term-years"
-                type="number"
+                type="text"
+                inputMode="numeric"
                 placeholder="e.g., 25"
                 value={formData.mortgage.termYears ?? ''}
                 onChange={(e) => handleMortgageChange('termYears', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                min="1"
-                step="1"
               />
+              {errors['mortgage.termYears'] && (
+                <p className="text-red-600 text-sm mt-1">{errors['mortgage.termYears']}</p>
+              )}
             </div>
           </div>
         </div>
@@ -146,14 +195,16 @@ const Profile: React.FC = () => {
               </label>
               <input
                 id="heating"
-                type="number"
+                type="text"
+                inputMode="decimal"
                 placeholder="e.g., 120"
                 value={formData.currentExpenditure.heating ?? ''}
                 onChange={(e) => handleExpenditureChange('heating', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                min="0"
-                step="10"
               />
+              {errors['currentExpenditure.heating'] && (
+                <p className="text-red-600 text-sm mt-1">{errors['currentExpenditure.heating']}</p>
+              )}
             </div>
             
             <div>
@@ -162,14 +213,16 @@ const Profile: React.FC = () => {
               </label>
               <input
                 id="hot-water"
-                type="number"
+                type="text"
+                inputMode="decimal"
                 placeholder="e.g., 30"
                 value={formData.currentExpenditure.hotWater ?? ''}
                 onChange={(e) => handleExpenditureChange('hotWater', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                min="0"
-                step="10"
               />
+              {errors['currentExpenditure.hotWater'] && (
+                <p className="text-red-600 text-sm mt-1">{errors['currentExpenditure.hotWater']}</p>
+              )}
             </div>
             
             <div>
@@ -178,14 +231,16 @@ const Profile: React.FC = () => {
               </label>
               <input
                 id="rent-mortgage"
-                type="number"
+                type="text"
+                inputMode="decimal"
                 placeholder="e.g., 1200"
                 value={formData.currentExpenditure.rentOrMortgage ?? ''}
                 onChange={(e) => handleExpenditureChange('rentOrMortgage', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                min="0"
-                step="50"
               />
+              {errors['currentExpenditure.rentOrMortgage'] && (
+                <p className="text-red-600 text-sm mt-1">{errors['currentExpenditure.rentOrMortgage']}</p>
+              )}
             </div>
             
             <div>
@@ -194,14 +249,16 @@ const Profile: React.FC = () => {
               </label>
               <input
                 id="house-maintenance"
-                type="number"
+                type="text"
+                inputMode="decimal"
                 placeholder="e.g., 100"
                 value={formData.currentExpenditure.houseMaintenance ?? ''}
                 onChange={(e) => handleExpenditureChange('houseMaintenance', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                min="0"
-                step="10"
               />
+              {errors['currentExpenditure.houseMaintenance'] && (
+                <p className="text-red-600 text-sm mt-1">{errors['currentExpenditure.houseMaintenance']}</p>
+              )}
             </div>
           </div>
         </div>
